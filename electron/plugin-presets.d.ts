@@ -9,5 +9,6 @@ export declare class PluginPresetLibrary {
     constructor(directory: string);
     read(id: unknown): SavedPluginProfile;
     list(): SavedPluginProfile[];
-    save(name: unknown, values: number[]): SavedPluginProfile;
+    importFile(text: string): SavedPluginProfile;
+    save(name: unknown, values: number[], unique?: boolean): SavedPluginProfile;
 }

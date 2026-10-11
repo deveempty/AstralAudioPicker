@@ -19,7 +19,7 @@ export default function PluginControl() {
  const [name,setName]=useState('')
  const [saveOpen,setSaveOpen]=useState(false)
  const [presetError,setPresetError]=useState<string|null>(null)
- const [notice,setNotice]=useState<'saved'|'loaded'|null>(null)
+ const [notice,setNotice]=useState<'saved'|'loaded'|'imported'|'exported'|null>(null)
  const actionRunning=useRef(false),running=useRef(false),alive=useRef(true)
  const queued=useRef<Patch>({}),timer=useRef<ReturnType<typeof setTimeout>>()
  const apply=(result: PluginResult)=>{if(!alive.current)return;if(result.success){setSnapshot(old=>!old||result.snapshot.state.revision>=old.state.revision?result.snapshot:old);setError(null)}else setError(result.code)}
@@ -46,6 +46,7 @@ export default function PluginControl() {
  const builtin=(id:BuiltinPluginProfile)=>action(async()=>{const result=await window.electronAPI.applyBuiltinPluginPreset(id);apply(result);if(result.success){setSelected('');setNotice('loaded')}})
  const save=(saveName=name.trim())=>action(async()=>{if(!snapshot)return;const result=await window.electronAPI.savePluginPreset(saveName,snapshot.state.revision);acceptLibrary(result);if(result.success){setNotice('saved');setSaveOpen(false)}})
  const load=()=>action(async()=>{const result=await window.electronAPI.loadPluginPreset(selected);apply(result);if(result.success)setNotice('loaded');else setPresetError(result.code)})
+ const transfer=(kind:'import'|'export')=>action(async()=>{const result=await(kind==='import'?window.electronAPI.importPluginPreset():window.electronAPI.exportPluginPreset(selected));if(!result.success){setPresetError(result.code);return}if(result.canceled)return;if(result.library)acceptLibrary(result.library);setNotice(kind==='import'?'imported':'exported')})
  if(!snapshot)return <Text role="status" color={error?'red.300':'whiteAlpha.500'}>{t(error?'plugin.error.storage':'plugin.loading')}</Text>
  const {state}=snapshot
  const {moduleMissing,synced,statusKey}=cosmicAudioStatus(snapshot)
@@ -66,6 +67,7 @@ export default function PluginControl() {
     <AstralButton variant="secondary" disabled={dirty} onClick={()=>{setName('');setSaveOpen(v=>!v)}}>{t('cosmic.saveAs')}</AstralButton>
     <AstralButton disabled={dirty||!selected||!library.some(p=>p.id===selected)} variant="ghost" onClick={()=>{const target=library.find(p=>p.id===selected);if(target)void save(target.name)}}>{t('plugin.updatePreset')}</AstralButton>
    </Flex>
+   <Flex mt="3" gap="2" flexWrap="wrap"><AstralButton size="sm" variant="secondary" disabled={dirty} onClick={()=>void transfer('import')}>{t('plugin.import')}</AstralButton><AstralButton size="sm" variant="secondary" disabled={dirty||!library.some(p=>p.id===selected)} title={t('plugin.exportHelp')} onClick={()=>void transfer('export')}>{t('plugin.export')}</AstralButton></Flex>
    {selected?<Text mt="2" fontSize="xs" color="whiteAlpha.700">{t('cosmic.updateTarget',{name:library.find(p=>p.id===selected)?.name??''})}</Text>:null}
    {saveOpen?<Box mt="3" p="3" bg="whiteAlpha.50" borderRadius="8px">
     <label htmlFor="cosmic-preset-name">{t('plugin.presetName')}</label>

@@ -8,18 +8,18 @@ const clientId='1423104834629926992'
 const redirect='http://127.0.0.1:51789/callback'
 interface Credentials {accessToken:string;refreshToken:string;expiresAt:number}
 interface Session {credentials:Credentials;createdAt:number}
-export interface CosmicAccount {id:string;username:string}
+export interface CosmicAccount {id:string;username:string;avatarUrl?:string}
 export interface CosmicAuthOptions {
  directory:string
  policy:CosmicRolePolicy
  // Server must derive the Discord identity from the bearer, never a client-provided user ID.
- verify:(accessToken:string)=>Promise<{id:string;username:string;roles:string[]}>
+ verify:(accessToken:string)=>Promise<{id:string;username:string;avatar?:string|null;roles:string[]}>
 }
 export function createCosmicAuth(options:CosmicAuthOptions){
  const file=path.join(options.directory,'cosmic-session.encrypted');let generation=0,busy=false,cancel:(()=>void)|undefined
  const request=async(url:string,init:RequestInit={})=>{const r=await fetch(url,{...init,redirect:'error',signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('DISCORD_HTTP_'+r.status);return r.json()}
  const credentials=async(body:URLSearchParams):Promise<Credentials>=>{const value=await request('https://discord.com/api/v10/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});if(typeof value.access_token!=='string'||typeof value.refresh_token!=='string'||!Number.isFinite(value.expires_in)||value.expires_in<=0)throw Error('INVALID_SESSION');return {accessToken:value.access_token,refreshToken:value.refresh_token,expiresAt:Date.now()+value.expires_in*1000}}
- const verify=async(token:string):Promise<CosmicAccount>=>{const access=await options.verify(token);if(typeof access.id!=='string'||typeof access.username!=='string'||!hasCosmicAccess(access.roles,options.policy))throw Error('ACCESS_DENIED');return {id:access.id,username:access.username}}
+ const verify=async(token:string):Promise<CosmicAccount>=>{const access=await options.verify(token);if(typeof access.id!=='string'||typeof access.username!=='string'||!hasCosmicAccess(access.roles,options.policy))throw Error('ACCESS_DENIED');return {id:access.id,username:access.username,avatarUrl:/^\d{17,20}$/.test(access.id)&&typeof access.avatar==='string'&&/^(?:a_)?[a-f0-9]{32}$/.test(access.avatar)?'https://cdn.discordapp.com/avatars/'+access.id+'/'+access.avatar+'.png?size=64':undefined}}
  const save=async(session:Session,epoch:number)=>{if(epoch!==generation)throw Error('SESSION_CANCELLED');if(!safeStorage.isEncryptionAvailable())throw Error('ENCRYPTION_UNAVAILABLE');await fs.mkdir(options.directory,{recursive:true});const temp=file+'.'+crypto.randomUUID()+'.tmp';try{await fs.writeFile(temp,safeStorage.encryptString(JSON.stringify(session)),{flag:'wx'});if(epoch!==generation)throw Error('SESSION_CANCELLED');await fs.rename(temp,file)}finally{await fs.rm(temp,{force:true})}}
  const run=async<T>(work:()=>Promise<T>)=>{if(busy)throw Error('AUTH_BUSY');busy=true;try{return await work()}finally{busy=false}}
  const login=()=>run(async()=>{

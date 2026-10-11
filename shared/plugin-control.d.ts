@@ -616,3 +616,11 @@ export declare function builtinPluginValues(id: BuiltinPluginProfile): number[];
 export declare function samePluginValues(a: readonly number[], b: readonly number[]): boolean;
 export declare function pluginFingerprint(values: readonly number[]): number;
 export declare function isPluginEvidence(value: unknown): value is PluginEvidence;
+export type PluginTransferResult = {
+    success: true;
+    canceled: boolean;
+    library?: PluginLibraryResult;
+} | {
+    success: false;
+    code: 'invalidName' | 'missingPreset' | 'invalidPreset' | 'storage' | 'busy' | 'stale';
+};

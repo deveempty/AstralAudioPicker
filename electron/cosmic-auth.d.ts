@@ -2,6 +2,7 @@ import { type CosmicRolePolicy } from './cosmic-delivery';
 export interface CosmicAccount {
     id: string;
     username: string;
+    avatarUrl?: string;
 }
 export interface CosmicAuthOptions {
     directory: string;
@@ -9,6 +10,7 @@ export interface CosmicAuthOptions {
     verify: (accessToken: string) => Promise<{
         id: string;
         username: string;
+        avatar?: string | null;
         roles: string[];
     }>;
 }

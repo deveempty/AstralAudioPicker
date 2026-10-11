@@ -18,12 +18,19 @@ export class PluginPresetLibrary {
   return {id,name:v.name,values:v.values}
  }
  list(): SavedPluginProfile[] { if(!fs.existsSync(this.directory))return [];return fs.readdirSync(this.directory).filter(f=>f.endsWith('.json')).flatMap(id=>{try{return [this.read(id)]}catch{return []}}).sort((a,b)=>a.name.localeCompare(b.name)) }
- save(name: unknown, values: number[]): SavedPluginProfile {
+ importFile(text:string):SavedPluginProfile {
+  if(Buffer.byteLength(text,'utf8')>16384)throw new PresetError('invalidPreset')
+  let value;try{value=JSON.parse(text.replace(/^\uFEFF/,''))}catch{throw new PresetError('invalidPreset')}
+  if(!value||typeof value!=='object'||value.schema!=='astral-v3-named-preset'||value.version!==1||value.stateVersion!==3||!validName(value.name)||!validPluginValues(value.values))throw new PresetError('invalidPreset')
+  return this.save(value.name,value.values,true)
+ }
+ save(name: unknown, values: number[], unique = false): SavedPluginProfile {
   if(!validName(name))throw new PresetError('invalidName');if(!validPluginValues(values))throw new PresetError('invalidPreset');name=name.trim()
   fs.mkdirSync(this.directory,{recursive:true});const lock=path.join(this.directory,'library.lock');let fd: number
   try { if(fs.existsSync(lock)&&Date.now()-fs.statSync(lock).mtimeMs>30000)fs.unlinkSync(lock) } catch { /* Windows holds an exclusive DLL lock while saving. */ }
   try{fd=fs.openSync(lock,'wx')}catch(e){if(['EEXIST','EACCES','EPERM'].includes((e as NodeJS.ErrnoException).code||''))throw new PresetError('busy');throw e}
   try {
+   if(unique){const names=new Set(this.list().map(p=>p.name.toLowerCase()));const base=name as string;let suffix=2;while(names.has((name as string).toLowerCase())){const tail=' ('+suffix+++')';name=Array.from(base).slice(0,64-tail.length).join('')+tail}}
    const existing=this.list().find(p=>p.name.toLowerCase()===(name as string).toLowerCase());const id=existing?.id || randomUUID()+'.json';const temporary=path.join(this.directory,randomUUID()+'.tmp')
    try { const data={schema:'astral-v3-named-preset',version:1,stateVersion:3,name,updatedAt:new Date().toISOString(),values};const out=fs.openSync(temporary,'wx');try{fs.writeFileSync(out,JSON.stringify(data));fs.fsyncSync(out)}finally{fs.closeSync(out)};fs.renameSync(temporary,path.join(this.directory,id)) }finally{if(fs.existsSync(temporary))fs.unlinkSync(temporary)}
    return {id,name:name as string,values:[...values]}

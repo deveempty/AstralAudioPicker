@@ -1,3 +1,5 @@
+import {createPluginTransfer} from './plugin-transfer'
+import {v5SlotIndex,setV5Route} from './v5-routing'
 import {runDiagnostics} from './diagnostics'
 import {audioLocalTest} from './local-test-mode'
 import {createAudioAccess} from './audio-access'
@@ -178,7 +180,7 @@ function updateMainConfig(selection: 'none' | 'v1' | 'v2' | 'aiwv2' | 'aiwv5' | 
       }
     }
 
-    fs.writeFileSync(CONFIG_FILE, routeCustomOutput(newLines.join('\n'), selection === 'custom'), 'utf-8')
+    fs.writeFileSync(CONFIG_FILE, routeCustomOutput(setV5Route(newLines.join('\n'),selection === 'aiwv5'), selection === 'custom'), 'utf-8')
     fs.writeFileSync(pickerStateFile, JSON.stringify({ mainConfig: selection }), 'utf8')
     return true
   } catch (err) {
@@ -878,13 +880,9 @@ ipcMain.handle('search-headphone-eqs', (_event, query: string, limit?: number, t
 function readV5Include(slot: V5IncludeSlot): string | null {
   if (!fs.existsSync(MAIN_CONFIG_FILE)) return null
   const lines = fs.readFileSync(MAIN_CONFIG_FILE, 'utf8').split(/\r?\n/)
-  const deviceIndex = lines.findIndex(line => line.trim().startsWith('Device:') && line.includes(V5_DEVICE_NAME))
-  if (deviceIndex < 0) return null
-  const marker = slot === 'tune' ? '# 16ch TUNE' : '# EQ'
-  const markerIndex = lines.findIndex((line, index) => index > deviceIndex && line.trim().toLowerCase().startsWith(marker.toLowerCase()))
-  if (markerIndex < 0) return null
-  const include = lines.slice(markerIndex + 1).find(line => /^\s*Include:/i.test(line))
-  return include?.replace(/^\s*Include:\s*/i, '').trim() ?? null
+  const index=v5SlotIndex(lines,slot)
+  return index<0?null:lines[index].replace(/^\s*#?\s*Include:\s*/i,'').trim()
+
 }
 
 ipcMain.handle('get-v5-active-state', () => {
@@ -937,16 +935,10 @@ function updateV5Include(slot: V5IncludeSlot, absoluteFile: string): boolean {
   if (relativeFile.startsWith('..')) return false
 
   const lines = fs.readFileSync(MAIN_CONFIG_FILE, 'utf8').split(/\r?\n/)
-  const deviceIndex = lines.findIndex(line => line.trim().startsWith('Device:') && line.includes(V5_DEVICE_NAME))
-  if (deviceIndex < 0) return false
-
-  const marker = slot === 'tune' ? '# 16ch TUNE' : '# EQ'
-  const markerIndex = lines.findIndex((line, index) => index > deviceIndex && line.trim().toLowerCase().startsWith(marker.toLowerCase()))
-  if (markerIndex < 0) return false
-  const includeIndex = lines.findIndex((line, index) => index > markerIndex && /^\s*Include:/i.test(line))
-  if (includeIndex < 0) return false
-
-  lines[includeIndex] = `Include: ${relativeFile}`
+  const includeIndex=v5SlotIndex(lines,slot)
+  if(includeIndex<0)return false
+  const enabled=readConfigState().mainConfig==='aiwv5'
+  lines[includeIndex]=(enabled?'':'# ')+`Include: ${relativeFile}`
   const temporaryFile = `${MAIN_CONFIG_FILE}.astral.tmp`
   fs.writeFileSync(temporaryFile, lines.join('\r\n'), 'utf8')
   fs.renameSync(temporaryFile, MAIN_CONFIG_FILE)
@@ -1047,6 +1039,9 @@ ipcMain.handle('delete-saved-headphone-eq', (_event, files: Partial<Record<'atV1
 
 // Plugin controls use a separate shared profile, not legacy APO routing files.
 const pluginControl = new PluginControlStore(pluginControlDirectory())
+const pluginTransfer=createPluginTransfer(pluginControl.library,()=>win)
+ipcMain.handle('import-plugin-preset',()=>pluginTransfer.import())
+ipcMain.handle('export-plugin-preset',(_event,id:unknown)=>pluginTransfer.export(id))
 ipcMain.handle('list-plugin-presets', () => pluginControl.listSaved())
 ipcMain.handle('save-plugin-preset', (_event, name: unknown, revision: unknown) => pluginControl.saveNamed(name, revision))
 ipcMain.handle('load-plugin-preset', (_event, id: unknown) => pluginControl.loadSaved(id))

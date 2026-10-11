@@ -642,3 +642,5 @@ export function isPluginEvidence(value: unknown): value is PluginEvidence {
  const e=value as PluginEvidence
  return Number.isInteger(e.hash) && e.hash>=0 && e.hash<=0xffffffff && Number.isSafeInteger(e.blocks) && e.blocks>=0 && [0,1,2].includes(e.state) && [e.input,e.output].every(x=>typeof x==='number' && Number.isFinite(x) && x>=0) && Array.isArray(e.delta) && e.delta.length===3 && e.delta.every(x=>typeof x==='number'&&Number.isFinite(x)&&x>=0)
 }
+
+export type PluginTransferResult = {success:true;canceled:boolean;library?:PluginLibraryResult} | {success:false;code:'invalidName'|'missingPreset'|'invalidPreset'|'storage'|'busy'|'stale'}

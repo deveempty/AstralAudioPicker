@@ -31,6 +31,8 @@ declare global {
 
   interface Window {
     electronAPI: {
+      importPluginPreset: () => Promise<import('../shared/plugin-control').PluginTransferResult>
+      exportPluginPreset: (id:string) => Promise<import('../shared/plugin-control').PluginTransferResult>
       runAudioDiagnostics: () => Promise<import('../shared/diagnostics').DiagnosticReport>
       audioAccessStatus: () => Promise<import('../shared/audio-access').AudioAccessStatus>
       audioAccessLogin: () => Promise<import('../shared/audio-access').AudioAccessStatus>

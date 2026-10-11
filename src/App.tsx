@@ -1,3 +1,4 @@
+import AccountSidebar from './components/AccountSidebar'
 import Diagnostics from './components/Diagnostics'
 import CosmicAudioStatus from './components/CosmicAudioStatus'
 import AudioBrand from './components/AudioBrand'
@@ -97,6 +98,7 @@ export default function App() {
           </Flex>
         })}</VStack>
         <Box className="audio-sidebar-tools" mt="auto" pt="5"><SidebarAudioActions /><PickerUpdateControl /><Box mt="2" p="3" borderRadius="10px" bg="#100d13" border="1px solid rgba(255,255,255,.065)"><Flex align="center" gap="2" color={exists ? 'green.300' : 'red.300'}><FiCheckCircle size="13" /><Text fontSize="11px" fontWeight="700">Equalizer APO</Text></Flex><Text mt="1" color="whiteAlpha.350" fontSize="10px">{t(exists ? 'status.configurationDetected' : 'status.installationRequired')}</Text></Box></Box>
+        <AccountSidebar/>
       </Box>
 
       <Flex flex="1" minW="0" direction="column" className="audio-main"><header className="core-topbar"><strong>{t(section==='profiles'?'profiles.title':section==='diagnostics'?'diagnostics.title':'autoeq.title')}</strong><span>{t(section==='profiles'?'profiles.subtitle':section==='diagnostics'?'diagnostics.subtitle':'autoeq.subtitle')}</span></header>

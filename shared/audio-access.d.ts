@@ -2,6 +2,7 @@ export type AudioAccessPhase = 'signedOut' | 'checking' | 'analyzing' | 'downloa
 export interface AudioAccessStatus {
     phase: AudioAccessPhase;
     username?: string;
+    avatarUrl?: string;
     localTest?: boolean;
     stage?: string;
     code?: string;

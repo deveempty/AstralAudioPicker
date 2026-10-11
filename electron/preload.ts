@@ -4,6 +4,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 // Here we just expose the IPC bridge without explicit typing to avoid conflicts
 
 const electronAPI = {
+  importPluginPreset: () => ipcRenderer.invoke('import-plugin-preset'),
+  exportPluginPreset: (id:string) => ipcRenderer.invoke('export-plugin-preset',id),
   runAudioDiagnostics: () => ipcRenderer.invoke('run-audio-diagnostics'),
   audioAccessStatus: () => ipcRenderer.invoke('audio-access-status'),
   audioAccessLogin: () => ipcRenderer.invoke('audio-access-login'),
