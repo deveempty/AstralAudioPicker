@@ -1,0 +1,34 @@
+﻿# Dependencies and generated builds
+node_modules/
+/dist/
+/dist-electron/
+/release/
+/portable/
+/light-portable/
+/no-obfuscation/
+/JUSTOCHECK/
+*.tsbuildinfo
+.obfuscation-manifest.json
+# Local environments and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+.dev.vars
+.dev.vars.*
+*.pem
+*.key
+*.pfx
+*.p12
+.npmrc
+.aws/
+.wrangler/
+# Local tooling and caches
+.superdesign/
+/tools-dev/.runtime/
+__pycache__/
+*.pyc
+.venv/
+*.log
+.DS_Store
+Thumbs.db

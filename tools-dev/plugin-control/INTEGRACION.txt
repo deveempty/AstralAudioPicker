@@ -1,0 +1,39 @@
+﻿REVAMP 04 - PICKER Y PLUGIN BIDIRECCIONALES
+
+DLL: Lirio EQ v3 Replica.dll. Mantener RaraModules junto al DLL.
+Codigo del Picker actualizado: D:\AstralCore\Astral Audio Core\AstralAudioV2\AstralAudioPicker (base 2.3.4).
+El ejecutable instalado del Picker NO fue reemplazado ni publicado. La integracion esta en el codigo fuente y fue verificada en una vista de desarrollo aislada con el DLL real.
+El instalador queda pendiente, segun lo solicitado. No se escribio en Program Files, no se cambiaron endpoints, no se reinicio audio ni se activo una nueva ruta APO.
+
+USO Y PERFIL
+La nueva seccion Plugin contiene los controles por grupos y los botones Restaurar estandar / Recuperar mis ajustes.
+Estandar v1 es una base inicial, no un ajuste auditivo universal:
+- V3 actual ON; Loudness EQ / Footstep / LUFS ON.
+- Pasos +12 dB, sensibilidad 45%, graves +6 dB, agudos +2 dB, mezcla 100%, refuerzo enemigo +2 dB, ambiente V3 80%, salida 0 dB.
+- Disparos ON: volumen 18%, sensibilidad 62%, release 121.9 ms, AI 72%.
+- Ambiente nuevo ON: reduccion -3 dB, detector 70..1800 Hz.
+- Compresor OFF.
+Los cambios del Picker y del editor del DLL se comparten y persisten. Restaurar estandar archiva los ajustes personales para recuperarlos.
+Sin archivo compartido, el DLL conserva el funcionamiento local de REVAMP 03 y sus valores iniciales anteriores. No impone el estandar hasta que se crea el perfil desde el Picker.
+
+CONTRATO
+Ruta de produccion: %ProgramData%\AstralAudio\Control\v3\profile.json.
+Directorio de pruebas: variable ASTRAL_PLUGIN_CONTROL_DIR, usada solo en procesos de prueba.
+Schema astral-plugin-v3; stateVersion 3; standardVersion 1; 50 valores normalizados y revision monotona.
+El Picker crea el perfil al abrir su seccion Plugin. El plugin consulta el archivo desde un hilo de control independiente, cada 50 ms.
+Los sliders del Picker agrupan escrituras; la respuesta es eventual, no automatizacion sample-accurate. Puede tardar unas decimas de segundo en reflejarse el estado visual.
+Bloqueo entre procesos y reemplazo atomico; se mezclan cambios por parametro. Si dos interfaces cambian el mismo parametro a la vez, gana el ultimo cambio escrito.
+Una vez conectado, el perfil compartido tiene prioridad sobre los chunks guardados por APO; los sliders locales del plugin siguen funcionando en ambos sentidos. Para importar un preset antiguo al control compartido habria que implementar una accion explicita de importacion.
+El indicador de audio exige un heartbeat reciente de una instancia que realmente haya ejecutado processBlock con la revision recibida. Una instancia de editor sin audio no se presenta como motor de audio conectado.
+El indicador no certifica que el dispositivo este enrutado correctamente ni que el usuario oiga sonido.
+
+LIMITES Y SIGUIENTE ENTREGA
+Pendiente: empaquetar el nuevo Picker, instalar DLL y dependencias en ruta final, y validar permisos compartidos entre usuario/servicio audiodg bajo Windows. Esto se hara con la integracion del instalador.
+No se probo la comunicacion entre cuentas distintas ni contra el audiodg activo. Las pruebas usaron procesos propios aislados sin dispositivo de audio.
+La futura interfaz exclusiva del Picker puede bloquear createEditor / effEditOpen del plugin sin cambiar este protocolo. Por ahora el editor sigue abierto, como se solicito.
+El control ENV TAME no se muestra en el Picker: la revision anterior no encontro efecto DSP para ese parametro.
+
+VERIFICACION
+TypeScript del renderer y proceso principal verificado. Diez pruebas de sincronizacion entre dos procesos reales de plugin, incluida instancia sin preparar audio, cambios en ambos sentidos, concurrencia, recuperacion de perfiles y estado invalido.
+Interfaz ES/EN probada con Playwright y el backend real conectado al DLL; sin errores JavaScript. Se verifico slider, cambio desde DLL, toggle y restauracion de perfiles.
+Suite de regresion del proyecto: 19/19; las pruebas V3 se repitieron tras los ajustes finales de persistencia.

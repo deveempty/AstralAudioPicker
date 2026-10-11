@@ -1,0 +1,3 @@
+[submodule "tools-dev/vendor/game-3d-audio-spatial-config-agent-skill"]
+	path = tools-dev/vendor/game-3d-audio-spatial-config-agent-skill
+	url = https://github.com/dungnotnull/game-3d-audio-spatial-config-agent-skill.git

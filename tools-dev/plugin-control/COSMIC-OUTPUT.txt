@@ -1,0 +1,23 @@
+COSMIC OUTPUT PROFILE
+
+Public name: Cosmic. Internal mainConfig ID: custom. 16 channels, CABLE In 16ch.
+The old Plugin navigation item is removed. Profiles > Cosmic opens factory presets, named profiles, sliders and audio evidence.
+Opening the card does not activate routing. Activate Cosmic output is explicit; the footer continues showing the actual selected output.
+The installer must deploy the integrated REVAMP07-or-later engine to:
+  EqualizerAPO/config/plugins/AstralAudio/Cosmic.dll
+Existing profile storage and the bidirectional control protocol remain unchanged.
+Cosmic does not reuse AIW V5 headphone correction or claim a new AutoEQ target. The existing three AutoEQ folders are untouched.
+
+Activation checks that the installed engine exists. Missing installation returns CUSTOM_OUTPUT_NOT_INSTALLED without changing audio configuration.
+A managed block selects the 16-channel endpoint and loads the engine. Incompatible managed includes and prior direct Lirio instances are suspended with reversible comments. Other user filters remain intact.
+Switching away removes the block. Endpoint failure restores the previous configuration and saved selection.
+
+Validation: Electron/renderer TypeScript; isolated route insertion, exclusivity, preservation, restoration and idempotence; Playwright ES/EN with real DLL control backend, presets/save/load/update and missing-installation feedback.
+No live APO configuration, endpoint or installed executable was changed. No release was packaged/published.
+
+UX UPDATE
+Start here: six commonly adjusted controls, two-column desktop layout and inline ES/EN help on all exposed controls. Diagnostics, storage path and recovery are collapsed below sliders. Prerequisite notices identify disabled stages. Final chain is displayed as a switch because DSP uses a 50% threshold.
+Save as opens a padded, labelled input and rejects duplicate names in the UI; Update explicitly targets the selected saved profile. Saved presets are not overwritten by slider movement.
+Validated with typecheck and Playwright against the real control backend/DLL: presets, save/load/update, duplicate-name protection, input padding, all control tabs, ES/EN and desktop/compact rendering. Browser plugin unavailable, so Playwright fallback used.
+
+DIRECT SELECTION: Clicking the Cosmic output card now immediately invokes setMainConfig(custom), like other output profiles. Removed secondary activation button. Active card and footer follow confirmed backend state; failures keep the previous output and show a persistent message.

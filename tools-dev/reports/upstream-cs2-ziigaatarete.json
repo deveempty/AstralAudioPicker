@@ -1,0 +1,140 @@
+{
+  "game": "Counter-Strike 2",
+  "headphones": "ziigaatarete",
+  "hrtf_config": {
+    "enabled": true,
+    "backend": "game_builtin",
+    "personalized": false,
+    "elevation_cues": true,
+    "distance_modeling": true,
+    "room_reverb": false,
+    "head_circumference_cm": 57.0,
+    "ear_spacing_cm": 15.0
+  },
+  "eq_bands": [
+    {
+      "freq": 80.0,
+      "gain_db": -3.0,
+      "q": 0.6,
+      "type": "low_shelf",
+      "label": "bass_cleanup"
+    },
+    {
+      "freq": 375.0,
+      "gain_db": 2.0,
+      "q": 1.5,
+      "type": "peaking",
+      "label": "footsteps_low"
+    },
+    {
+      "freq": 750.0,
+      "gain_db": 2.0,
+      "q": 1.5,
+      "type": "peaking",
+      "label": "footsteps_mid"
+    },
+    {
+      "freq": 1500.0,
+      "gain_db": 2.0,
+      "q": 1.5,
+      "type": "peaking",
+      "label": "footsteps_high"
+    },
+    {
+      "freq": 3000.0,
+      "gain_db": 2.0,
+      "q": 1.5,
+      "type": "peaking",
+      "label": "ability_cues"
+    },
+    {
+      "freq": 6000.0,
+      "gain_db": 2.0,
+      "q": 1.5,
+      "type": "peaking",
+      "label": "reload_detail"
+    },
+    {
+      "freq": 10000.0,
+      "gain_db": -1.0,
+      "q": 0.7,
+      "type": "high_shelf",
+      "label": "air_tame"
+    }
+  ],
+  "eq_response_curve": [
+    {
+      "freq_hz": 31,
+      "gain_db": -2.46
+    },
+    {
+      "freq_hz": 62,
+      "gain_db": -1.59
+    },
+    {
+      "freq_hz": 125,
+      "gain_db": -0.53
+    },
+    {
+      "freq_hz": 250,
+      "gain_db": 0.73
+    },
+    {
+      "freq_hz": 500,
+      "gain_db": 2.01
+    },
+    {
+      "freq_hz": 1000,
+      "gain_db": 2.19
+    },
+    {
+      "freq_hz": 2000,
+      "gain_db": 2.18
+    },
+    {
+      "freq_hz": 4000,
+      "gain_db": 1.99
+    },
+    {
+      "freq_hz": 8000,
+      "gain_db": 0.97
+    },
+    {
+      "freq_hz": 16000,
+      "gain_db": -0.49
+    }
+  ],
+  "cue_analysis": {
+    "itd_accuracy": 2.19,
+    "ild_accuracy": 14.14,
+    "elevation_detection": 85.0,
+    "distance_estimation": 80.0,
+    "front_back_confusion_risk": 0.705,
+    "overall_cue_clarity": 91.5,
+    "eq_optimized": true,
+    "dynamic_range_managed": true
+  },
+  "verdict": {
+    "category": "Optimal Cue Clarity",
+    "code": "OPTIMAL_CUE_CLARITY",
+    "spatial_score": 90.0,
+    "eq_score": 100.0
+  },
+  "sources": [
+    {
+      "source": "Begault & Wenzel (1993)",
+      "doi": "10.1162/pres.1993.2.3.223",
+      "tier": "1"
+    },
+    {
+      "source": "Wenzel et al. (1993)",
+      "doi": "10.1121/1.407130",
+      "tier": "1"
+    },
+    {
+      "source": "Kapralos et al. (2007)",
+      "doi": "10.1145/1280599",
+      "tier": "2"
+    }
+  ]
+}

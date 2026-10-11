@@ -1,0 +1,30 @@
+REVAMP 07 - PERFILES Y EVIDENCIA EN PICKER
+
+Integracion en el codigo fuente del Picker 2.3.4; ejecutable instalado sin reemplazar.
+Requiere DLL REVAMP 07 para biblioteca personal y evidencia de audio completa.
+Los tres motores estan integrados en la DLL: ya no requiere RaraModules.
+Este documento actualiza los requisitos de INTEGRACION.txt (REVAMP 04).
+
+FUNCIONES
+- Default de fabrica y perfiles Pasos natural, Pasos enfoque, Menos ambiente.
+- Misma configuracion de 50 parametros que la DLL; conserva Estandar v1 y recuperar ajustes.
+- Dropdown de perfiles, nombre, guardar, actualizar por nombre y cargar explicitamente.
+- Biblioteca compartida por usuario: %APPDATA%/AstralAudio/Presets/V3.
+- Archivos JSON con UUID, escritura atomica y bloqueo compatible con la DLL.
+- Validacion completa antes de aplicar. Guardar rechaza una revision que haya cambiado.
+- Los cambios siguen sincronizados en ambos sentidos.
+- Confirmacion mediante fingerprint de los valores procesados por el audio, no solo recibidos por el editor.
+- Picos entrada/salida y diferencias RMS por etapa; bypass y falta de evidencia no aparecen como aplicado.
+- Prioriza instancia audiodg si existe; muestra PID/origen cuando solo existe analizador/otro host.
+
+PRUEBAS
+Typecheck Electron y renderer OK.
+Comparacion de 200 valores de perfiles con el analisis de la DLL: OK.
+Interoperabilidad real con NamedProfiles.h C++: guardar/cargar en ambos sentidos, actualizar y persistir OK.
+Validacion de archivos, nombres, revision obsoleta y bloqueo: OK.
+14 comprobaciones de sincronizacion con instancias reales de DLL: OK.
+Playwright (fallback: plugin Browser no disponible): ES/EN, cuatro botones, guardar, dropdown, cargar, actualizar, recargar y sliders con DLL real, sin errores JS.
+Vista de desarrollo aislada; IPC Electron simulado hacia el backend real. No equivale a ejecutar un instalador empaquetado ni validar permisos de audiodg.
+Perfiles analizados con senales sinteticas; no garantizan separar enemigos de sonidos similares.
+
+No se publico ni empaqueto un nuevo EXE. No se alteraron rutas APO, endpoints ni servicios de audio.

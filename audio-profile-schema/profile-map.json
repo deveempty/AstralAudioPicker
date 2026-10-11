@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "atV1",
+      "publicName": "AT V1",
+      "internalTarget": "v2",
+      "eqFolder": "data/eq/v2",
+      "includeFile": "at_v1.txt",
+      "channels": "7.1",
+      "endpoint": "Cable Input 7.1"
+    },
+    {
+      "id": "aiwV3",
+      "publicName": "AIW V3",
+      "internalTarget": "v3",
+      "eqFolder": "data/eq/v3",
+      "includeFile": "aiw_v3.txt",
+      "channels": "7.1",
+      "endpoint": "Cable Input 7.1"
+    },
+    {
+      "id": "aiwV5",
+      "publicName": "AIW V5",
+      "internalTarget": "v5",
+      "eqFolder": "data/eq/v5",
+      "includeFile": null,
+      "channels": "16ch",
+      "endpoint": "CABLE In 16ch"
+    }
+  ]
+}

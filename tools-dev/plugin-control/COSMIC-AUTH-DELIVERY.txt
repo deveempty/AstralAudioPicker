@@ -1,0 +1,18 @@
+COSMIC AUTHENTICATION AND INDEPENDENT DELIVERY - PREPARATION
+
+Reference inspected: optimization-hub/astral-core-v2-lite/electron/capabilities/account/discordAuthCapability.ts and feature-content/clientResources.ts.
+
+Implemented, not wired into live application startup:
+- electron/cosmic-auth.ts: Discord PKCE, OAuth state, loopback callback, encrypted Picker-local session, refresh, identity/role validation via an injected server verifier. Credentials remain in Electron. No Core legacy session migration or debloat side effects.
+- electron/cosmic-delivery.ts: two-role all/any policy; authorized fixed-origin HTTPS download; bounded payload and SHA256/x64 PE checks; one active Cosmic.dll in a caller-specified Picker installation subdirectory; cached-file verification; reversible marked config block and backup; concurrent-content checks; rollback on failure.
+- Locked DLL replacement leaves the existing DLL intact and returns an error for the eventual UI to report as pending/retry. No audio restart or forced unload.
+
+Pending user inputs before wiring:
+1. Exactly two Discord role IDs; all or any; whether gate applies to the entire Picker or only Cosmic.
+2. Exact APO text to reconcile. No production directive chosen or inserted yet.
+3. Cloudflare Worker download route and authenticated manifest contract (version, size, SHA256, fixed-origin URL). Server must validate the bearer identity and roles. Do not use a public R2 link as an access-control mechanism.
+
+Integration next: login/checkSession -> authorized manifest -> delivery -> ready state -> enable Cosmic card. Trigger each authenticated startup; idempotence ensures first successful login after update reconciles without redownloading matching payloads. Route must use absolute Picker installation DLL path, replacing the earlier APO/plugins/AstralAudio assumption. Keep inactive Cosmic inactive during install repair.
+The existing AT installer orchestration and updater are unchanged. Current main/preload/UI are NOT yet connected to these preparation modules; existing Cosmic path remains unchanged until the final directive is defined.
+
+Checks: Electron+renderer typecheck passes. Isolated delivery tests verify repeat execution, matching payload cache, BOM/content retention, backup, denied access, invalid hash, malformed block, all/any role policy. Actual Discord, Worker and audiodg tests await final configuration. No live auth requests, R2 publishing or writes to Program Files were performed.

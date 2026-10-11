@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.astral.audiopicker",
+  "productName": "Astral Audio Switcher",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist",
+    "dist-electron"
+  ],
+  "extraResources": [
+    {
+      "from": "electron/scripts",
+      "to": "scripts",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "electron/tools",
+      "to": "tools",
+      "filter": ["**/*"]
+    }
+  ],
+  "win": {
+    "target": ["nsis"],
+    "icon": "src/assets/appicon.ico",
+    "requestedExecutionLevel": "requireAdministrator"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": true,
+    "allowElevation": true,
+    "artifactName": "Astral-Audio-Picker-Setup-${version}.${ext}"
+  },
+  "publish": {
+    "provider": "generic",
+    "url": "https://astral-audio-worker.astraltweaks.workers.dev/picker/stable"
+  },
+  "portable": {
+    "artifactName": "${productName}.exe"
+  }
+}

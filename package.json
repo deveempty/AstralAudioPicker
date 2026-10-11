@@ -1,0 +1,47 @@
+{
+  "name": "astral-audio-picker",
+  "private": true,
+  "version": "2.3.9-local.1",
+  "description": "Audio Switcher - Astral Tweaks",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "validate:audio": "node tools-dev/validate-audio.mjs",
+    "validate:payload": "node tools-dev/validate-audio.mjs --payload",
+    "validate:package": "node tools-dev/validate-package.mjs",
+    "audit:spatial": "powershell -NoProfile -ExecutionPolicy Bypass -File tools-dev/run-spatial-audit.ps1",
+    "lab:tune": "powershell -NoProfile -ExecutionPolicy Bypass -File tools-dev/tune-lab/start-tune-lab.ps1",
+    "build": "npm run validate:payload && npm run typecheck && vite build && node scripts/obfuscate.cjs && electron-builder",
+    "build:portable": "npm run validate:payload && npm run typecheck && vite build && node scripts/obfuscate.cjs && electron-builder --win portable",
+    "publish:update": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-update.ps1",
+    "preview": "vite preview",
+    "electron:dev": "vite",
+    "typecheck:electron": "tsc --project tsconfig.node.json --emitDeclarationOnly",
+    "typecheck": "npm run typecheck:electron && tsc --noEmit",
+    "dev:auth": "vite --mode auth-test"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.2.1",
+    "@emotion/react": "^11.13.3",
+    "electron-updater": "^6.8.9",
+    "framer-motion": "^11.15.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^30.5.1",
+    "electron-builder": "^25.1.8",
+    "javascript-obfuscator": "^5.6.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.1",
+    "vite-plugin-electron": "^0.28.8",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vite-plugin-obfuscator": "^1.0.5",
+    "vite-tsconfig-paths": "^5.1.3"
+  }
+}
