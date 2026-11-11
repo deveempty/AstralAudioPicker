@@ -4,6 +4,13 @@ import { contextBridge, ipcRenderer } from 'electron'
 // Here we just expose the IPC bridge without explicit typing to avoid conflicts
 
 const electronAPI = {
+  communityList: (query: import('../shared/community').CommunityQuery) => ipcRenderer.invoke('community-list',query),
+  communityPublish: (publication: import('../shared/community').CommunityPublication) => ipcRenderer.invoke('community-publish',publication),
+  communityApply: (id:string) => ipcRenderer.invoke('community-apply',id),
+  communityUndo: () => ipcRenderer.invoke('community-undo'),
+  communityFavorite: (id:string,saved:boolean) => ipcRenderer.invoke('community-favorite',id,saved),
+  communityReport: (id:string,reason:string) => ipcRenderer.invoke('community-report',id,reason),
+  communityRemove: (id:string) => ipcRenderer.invoke('community-remove',id),
   importPluginPreset: () => ipcRenderer.invoke('import-plugin-preset'),
   exportPluginPreset: (id:string) => ipcRenderer.invoke('export-plugin-preset',id),
   runAudioDiagnostics: () => ipcRenderer.invoke('run-audio-diagnostics'),

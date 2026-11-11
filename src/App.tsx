@@ -1,11 +1,13 @@
+import PickerUpdateBanner from './components/PickerUpdateBanner'
 import AccountSidebar from './components/AccountSidebar'
 import Diagnostics from './components/Diagnostics'
+import Community from './components/Community'
 import CosmicAudioStatus from './components/CosmicAudioStatus'
 import AudioBrand from './components/AudioBrand'
 import AudioAccessGate from './components/AudioAccessGate'
 import { useEffect, useState } from 'react'
 import { Box, Flex, Icon, Text, VStack } from '@chakra-ui/react'
-import { FiActivity, FiCheckCircle, FiHeadphones, FiSliders, FiVolume2 } from 'react-icons/fi'
+import { FiActivity, FiCheckCircle, FiChevronLeft, FiChevronRight, FiHeadphones, FiSliders, FiUsers, FiVolume2 } from 'react-icons/fi'
 import { LuWaves } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import TitleBar from './components/TitleBar'
@@ -22,17 +24,25 @@ import type { AutoEqLibraryGroup } from './types/electron'
 import { useI18n, type TranslationKey } from './i18n'
 
 type Selection = 'none' | 'v1' | 'v2' | 'aiwv2' | 'aiwv5' | 'custom'
-type Section = 'profiles' | 'autoeq' | 'diagnostics'
+type Section = 'profiles' | 'autoeq' | 'community' | 'diagnostics'
 interface ConfigState { mainConfig: Selection; v2Subs: Record<string, boolean> }
+const sidebarStorageKey = 'astral-audio.sidebar-collapsed.v1'
 const nav: Array<{ id: Section; label: TranslationKey; icon: IconType }> = [
   { id: 'profiles', label: 'nav.profiles', icon: FiSliders },
   { id: 'autoeq', label: 'nav.autoeq', icon: FiHeadphones },
+  { id: 'community', label: 'community.title', icon: FiUsers },
   { id: 'diagnostics', label: 'diagnostics.title', icon: FiActivity },
 ]
 
 export default function App() {
   const { t } = useI18n()
   const [customOpen, setCustomOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem(sidebarStorageKey) === 'true' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(sidebarStorageKey, String(sidebarCollapsed)) } catch { /* Keep navigation usable if storage is unavailable. */ }
+  }, [sidebarCollapsed])
   const [section, setSection] = useState<Section>('profiles')
   const [config, setConfig] = useState<ConfigState>({ mainConfig: 'none', v2Subs: {} })
   const [eqLibrary, setEqLibrary] = useState<AutoEqLibraryGroup[]>([])
@@ -90,21 +100,25 @@ export default function App() {
   return <Box className="audio-shell" w="100vw" h="100vh" overflow="hidden" borderRadius="18px" bg="#030405" color="white" position="relative">
     <TitleBar /><AudioAccessGate>
     <Flex className="core-picker-frame" position="absolute" inset="44px 0 0 0">
-      <Box className="audio-sidebar" w="236px" flexShrink="0" p="3"><AudioBrand/><div className="audio-nav-caption">{t('design.workspaceLabel')}</div>
+      <div className="audio-sidebar-dock" data-collapsed={sidebarCollapsed}>
+      <Box id="picker-sidebar" className="audio-sidebar" w="236px" flexShrink="0" p="3"><AudioBrand/><div className="audio-nav-caption">{t('design.workspaceLabel')}</div>
         <VStack gap="1" align="stretch">{nav.map(item => {
           const selected = item.id === section
-          return <Flex className="audio-nav-item" aria-current={selected?'page':undefined} key={item.id} as="button" position="relative" align="center" gap="3" h="66px" px="3" borderRadius="8px" bg={selected ? 'rgba(155,77,255,.105)' : 'transparent'} color={selected ? 'white' : 'whiteAlpha.500'} cursor="pointer" transition="160ms" _hover={{ bg: selected ? 'rgba(155,77,255,.13)' : 'rgba(255,255,255,.035)', color: 'white' }} onClick={() => setSection(item.id)}>
-            {selected ? <Box position="absolute" left="-12px" w="3px" h="22px" borderRightRadius="3px" bg="#9b4dff" boxShadow="0 0 14px rgba(155,77,255,.6)" /> : null}<Icon as={item.icon} boxSize="4" /><Text fontSize="sm" fontWeight={selected ? '700' : '500'}>{t(item.label)}<Text as="span" display="block" mt="1" fontSize="11px" fontWeight="400" color="#8c8c96">{t(item.id==='profiles'?'design.profilesNav':item.id==='diagnostics'?'diagnostics.subtitle':'design.eqNav')}</Text></Text>
+          return <Flex className="audio-nav-item" aria-label={t(item.label)} title={sidebarCollapsed ? t(item.label) : undefined} aria-current={selected?'page':undefined} key={item.id} as="button" position="relative" align="center" gap="3" h="66px" px="3" borderRadius="8px" bg={selected ? 'rgba(155,77,255,.105)' : 'transparent'} color={selected ? 'white' : 'whiteAlpha.500'} cursor="pointer" transition="160ms" _hover={{ bg: selected ? '#111319' : '#0e1016', color: 'white' }} onClick={() => setSection(item.id)}>
+            <Icon as={item.icon} boxSize="4" /><Text fontSize="sm" fontWeight={selected ? '700' : '500'}>{t(item.label)}<Text as="span" display="block" mt="1" fontSize="11px" fontWeight="400" color="#8c8c96">{t(item.id==='profiles'?'design.profilesNav':item.id==='community'?'community.subtitle':item.id==='diagnostics'?'diagnostics.subtitle':'design.eqNav')}</Text></Text>
           </Flex>
         })}</VStack>
         <Box className="audio-sidebar-tools" mt="auto" pt="5"><SidebarAudioActions /><PickerUpdateControl /><Box mt="2" p="3" borderRadius="10px" bg="#100d13" border="1px solid rgba(255,255,255,.065)"><Flex align="center" gap="2" color={exists ? 'green.300' : 'red.300'}><FiCheckCircle size="13" /><Text fontSize="11px" fontWeight="700">Equalizer APO</Text></Flex><Text mt="1" color="whiteAlpha.350" fontSize="10px">{t(exists ? 'status.configurationDetected' : 'status.installationRequired')}</Text></Box></Box>
-        <AccountSidebar/>
+        <div className="audio-sidebar-account" onClickCapture={() => { if (sidebarCollapsed) setSidebarCollapsed(false) }}><AccountSidebar/></div>
       </Box>
+      <button type="button" className="audio-sidebar-toggle" aria-expanded={!sidebarCollapsed} aria-controls="picker-sidebar" aria-label={t(sidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse')} title={t(sidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse')} onClick={() => setSidebarCollapsed(value => !value)}>
+        <span>{sidebarCollapsed ? <FiChevronRight aria-hidden="true" /> : <FiChevronLeft aria-hidden="true" />}</span>
+      </button>
+      </div>
 
-      <Flex flex="1" minW="0" direction="column" className="audio-main"><header className="core-topbar"><strong>{t(section==='profiles'?'profiles.title':section==='diagnostics'?'diagnostics.title':'autoeq.title')}</strong><span>{t(section==='profiles'?'profiles.subtitle':section==='diagnostics'?'diagnostics.subtitle':'autoeq.subtitle')}</span></header>
-        <Box className="audio-scroll" flex="1" minH="0" overflowY="auto" px="7" pt="6" pb="5" css={{ '&::-webkit-scrollbar': { width: '5px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(155,77,255,.3)', borderRadius: '6px' } }}>
+      <Flex flex="1" minW="0" direction="column" className="audio-main"><PickerUpdateBanner/><header className="core-topbar"><strong>{t(section==='profiles'?'profiles.title':section==='community'?'community.title':section==='diagnostics'?'diagnostics.title':'autoeq.title')}</strong><span>{t(section==='profiles'?'profiles.subtitle':section==='community'?'community.subtitle':section==='diagnostics'?'diagnostics.subtitle':'autoeq.subtitle')}</span></header>
+        <Box className="audio-scroll" data-section={section} flex="1" minH="0" overflowY="auto" px="7" pt="6" pb="5" css={{ '&::-webkit-scrollbar': { width: '5px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(155,77,255,.3)', borderRadius: '6px' } }}>
           <Box maxW="1120px" mx="auto">
-            <Text fontSize="38px" fontWeight="600" letterSpacing="-.035em">{t(section === 'profiles' ? 'profiles.title' : section==='diagnostics'?'diagnostics.title':'autoeq.title')}</Text><Text mt="1" mb="6" color="#a3a3a3" fontSize="sm">{t(section === 'profiles' ? 'profiles.subtitle' : section==='diagnostics'?'diagnostics.subtitle':'autoeq.subtitle')}</Text>
             {loading ? <Text color="whiteAlpha.400">{t('status.loadingConfig')}</Text> : !exists ? <Box p="5" bg="#100d13" border="1px solid rgba(251,113,133,.3)" borderRadius="10px"><Text color="red.300">{t('status.configMissing')}</Text></Box> : null}
             {!loading && exists && section === 'profiles' ? <VStack gap="5" align="stretch">
               <ConfigSelector currentSelection={config.mainConfig} onSelect={value => {setCustomOpen(value === 'custom'); void selectProfile(value)}} disabled={applying} statusMessage={status} />
@@ -116,6 +130,7 @@ export default function App() {
               {!customOpen && config.mainConfig === 'v2' ? <Box py="5" textAlign="center" borderTop="1px solid rgba(255,255,255,.055)"><Icon as={LuWaves} boxSize="6" color="whiteAlpha.200" /><Text mt="2" color="whiteAlpha.350" fontSize="sm">{t('status.atV2Routed')}</Text></Box> : null}
             </VStack> : null}
             {!loading && exists && section === 'autoeq' ? <AutoEqLibrary /> : null}
+            {section==='community'?<Community/>:null}
             {section==='diagnostics'?<Diagnostics/>:null}
           </Box>
         </Box>

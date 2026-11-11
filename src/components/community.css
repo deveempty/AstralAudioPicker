@@ -1,0 +1,64 @@
+.astral-community {color:#f2f3f5;}
+.astral-community-header {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px solid #24262d;padding-bottom:8px;}
+.astral-community-tabs {display:flex;gap:24px;}
+.astral-community-tabs button {display:flex;align-items:center;gap:8px;position:relative;cursor:pointer;padding:12px 0 16px;font-size:13px;color:#92959f;white-space:nowrap;}
+.astral-community-tabs button[aria-pressed=true] {color:#f2f3f5;}
+.astral-community-tabs button[aria-pressed=true]::after {content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:#9c82ee;}
+.astral-community-tabs button span {font-size:10px;background:#191a22;padding:1px 6px;border-radius:4px;color:#a9abb5;}
+.astral-community-toolbar {display:flex;gap:12px;align-items:center;margin:22px 0;}
+.astral-community input,.astral-community select,.astral-community textarea {border:1px solid #2b2d35;border-radius:7px;background:#0c0d11;color:#e6e7eb;padding:10px 12px;font:inherit;font-size:12px;min-width:0;color-scheme:dark;}
+.astral-community input::placeholder,.astral-community textarea::placeholder {color:#858995;}
+.astral-community input:focus-visible,.astral-community select:focus-visible,.astral-community textarea:focus-visible {outline:2px solid #a78bfa;outline-offset:2px;}
+.astral-community-search {display:flex;align-items:center;position:relative;flex:1;max-width:520px;}
+.astral-community-search svg {position:absolute;left:12px;color:#92959f;width:15px;height:15px;}
+.astral-community-search input {width:100%;padding-left:36px;}
+.astral-community-toolbar > span {margin-left:auto;white-space:nowrap;color:#92959f;font-size:11px;}
+.astral-community-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
+.astral-community-card {display:flex;flex-direction:column;min-width:0;padding:20px;border:1px solid #24262d;border-radius:10px;background:#08090c;transition:border-color 140ms;}
+.astral-community-card:hover {border-color:#4b435f;}
+.astral-community-card-top {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:22px;}
+.astral-community-engine {display:flex;align-items:center;gap:8px;color:#bca5ff;font-size:12px;font-weight:600;}
+.astral-community-engine svg {width:18px;height:18px;}
+.astral-community-label {color:#858995;font-size:10px;}
+.astral-community-tags {display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:#b1b4bf;}
+.astral-community-tags span {padding:3px 6px;background:#111319;border-radius:4px;border:1px solid #24262d;}
+.astral-community-card h2 {font-size:16px;line-height:1.5;font-weight:600;letter-spacing:-.02em;margin-top:12px;overflow-wrap:anywhere;}
+.astral-community-author {font-size:11px;color:#92959f;margin-top:4px;}
+.astral-community-description {font-size:12px;line-height:1.8;color:#acafba;margin:16px 0 22px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.astral-community-headphones {display:flex;align-items:center;gap:8px;color:#92959f;font-size:11px;margin-top:auto;min-height:32px;overflow-wrap:anywhere;}
+.astral-community-headphones svg {flex-shrink:0;}
+.astral-community-card-footer {display:flex;justify-content:space-between;align-items:center;border-top:1px solid #24262d;margin-top:14px;padding-top:12px;gap:8px;}
+.astral-community-card-footer button {display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;min-height:32px;cursor:pointer;color:#c9c5d4;}
+.astral-community-card-footer button:hover {color:#fff;}
+.astral-community-applications {display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#92959f;font-variant-numeric:tabular-nums;}
+.astral-community-bookmark {width:32px;border:1px solid #2b2d35;border-radius:6px;}
+.astral-community-bookmark[aria-pressed=true] {color:#bca5ff;background:#21172f;border-color:#70549d;}
+.astral-community-empty {display:flex;flex-direction:column;align-items:center;text-align:center;padding:60px 24px;border:1px dashed #2b2d35;border-radius:10px;gap:16px;}
+.astral-community-empty > svg {width:28px;height:28px;color:#a79bc9;}
+.astral-community-empty h2 {font-size:20px;font-weight:600;}
+.astral-community-empty p {font-size:13px;line-height:1.7;color:#92959f;max-width:420px;}
+.astral-community-session {font-size:11px;color:#858995;margin-top:24px;}
+.astral-community-notice {font-size:12px;color:#8ad8b9;margin:16px 0;}
+.astral-community-error {font-size:12px;color:#fca5a5;margin:16px 0;}
+.astral-community button:disabled {opacity:.45;cursor:default;}
+.astral-community-pagination {display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:20px;font-size:12px;color:#92959f;}
+.astral-community-dialog fieldset {display:flex;flex-direction:column;gap:16px;border:0;padding:0;margin:0;min-width:0;}
+.astral-community-dialog {position:fixed;inset:0;margin:auto;width:min(540px,calc(100vw - 40px));max-height:calc(100vh - 80px);overflow:auto;padding:30px;border:1px solid #34303f;border-radius:14px;background:#0c0d11;color:#f2f3f5;box-shadow:0 24px 80px #0009;}
+.astral-community-dialog::backdrop {background:#000b;}
+.astral-community-close {position:absolute;right:14px;top:14px;display:grid;place-items:center;width:30px;height:30px;border:1px solid #2b2d35;border-radius:6px;cursor:pointer;color:#a1a4ae;}
+.astral-community-dialog h2 {font-size:24px;font-weight:600;letter-spacing:-.03em;margin:12px 24px 10px 0;overflow-wrap:anywhere;}
+.astral-community-dialog p {font-size:12px;line-height:1.8;color:#a1a4ae;}
+.astral-community-dialog dl {margin:24px 0;border-block:1px solid #24262d;padding:12px 0;}
+.astral-community-dialog dl > div {display:flex;justify-content:space-between;gap:24px;font-size:12px;padding:8px 0;}
+.astral-community-dialog dt {color:#92959f;}
+.astral-community-dialog dd {text-align:right;overflow-wrap:anywhere;min-width:0;}
+.astral-community-dialog h3 {font-size:13px;font-weight:600;margin-bottom:8px;}
+.astral-community-notes {white-space:pre-wrap;overflow-wrap:anywhere;}
+.astral-community-dialog .astral-community-dialog-note {padding:12px;border:1px solid #2b2d35;border-radius:7px;font-size:11px;margin:20px 0;background:#111319;}
+.astral-community-dialog form {display:flex;flex-direction:column;gap:16px;margin-top:24px;}
+.astral-community-dialog label {display:flex;flex-direction:column;gap:8px;font-size:12px;color:#d2d3da;flex:1;min-width:0;}
+.astral-community-dialog textarea {resize:vertical;}
+.astral-community-form-row {display:flex;gap:14px;}
+.astral-community-form-actions {display:flex;justify-content:flex-end;gap:10px;}
+@media(max-width:1200px) {.astral-community-grid {grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:700px) {.astral-community-grid {grid-template-columns:1fr;}.astral-community-toolbar {flex-wrap:wrap;}.astral-community-search {flex-basis:100%;max-width:none;}.astral-community-tabs {gap:18px;}.astral-community-form-row {flex-direction:column;}}

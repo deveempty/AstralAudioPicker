@@ -1,5 +1,5 @@
 ﻿import { PluginPresetLibrary, pluginPresetDirectory, PresetError } from './plugin-presets'
-import { builtinPluginProfiles, builtinPluginValues, isPluginEvidence, type BuiltinPluginProfile, type PluginLibraryResult } from '../shared/plugin-control'
+import { builtinPluginProfiles, builtinPluginValues, isPluginEvidence, validPluginValues, samePluginValues, type BuiltinPluginProfile, type PluginLibraryResult } from '../shared/plugin-control'
 import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -55,6 +55,31 @@ export class PluginControlStore {
   private replaceValues(values: number[]): PluginSnapshot { this.locked(()=>{const current=this.readState();if(current.profile==='custom')this.write('custom-profile.json',current);this.write('profile.json',{...current,values:[...values],profile:'custom',source:'picker',revision:current.revision+1})});return this.snapshot() }
   builtin(id: unknown): PluginResult { return this.result(()=>{if(typeof id!=='string'||!builtinPluginProfiles.includes(id as BuiltinPluginProfile))throw new ControlError('invalid');return this.replaceValues(builtinPluginValues(id as BuiltinPluginProfile))}) }
   loadSaved(id: unknown): PluginResult { return this.result(()=>this.replaceValues(this.library.read(id).values)) }
+  applyCommunity(values: unknown, expectedRevision: number): PluginResult { return this.result(() => {
+    if (!validPluginValues(values)) throw new ControlError('invalid')
+    this.locked(() => {
+      const current = this.readState()
+      if (current.revision !== expectedRevision) throw new PresetError('stale')
+      const next = { ...current, values: [...values], profile: 'custom', source: 'community', revision: current.revision + 1 }
+      // One managed undo record, never a downloaded file or a named-library import.
+      this.write('community-undo.json', { before: current, afterRevision: next.revision, afterValues: next.values })
+      this.write('profile.json', next)
+    })
+    return this.snapshot()
+  }) }
+  undoCommunity(): PluginResult { return this.result(() => {
+    this.locked(() => {
+      const file = this.file('community-undo.json')
+      if (!fs.existsSync(file) || fs.statSync(file).size > 16384) throw new ControlError('missingCustom')
+      const undo = JSON.parse(fs.readFileSync(file, 'utf8'))
+      if (!isPluginState(undo.before) || !validPluginValues(undo.afterValues)) throw new ControlError('invalid')
+      const current = this.readState()
+      if (current.revision !== undo.afterRevision || !samePluginValues(current.values, undo.afterValues)) throw new PresetError('stale')
+      this.write('profile.json', { ...undo.before, source: 'picker', revision: current.revision + 1 })
+      // Keep the fixed record; its old revision prevents repeated undo or overwriting later edits.
+    })
+    return this.snapshot()
+  }) }
   listSaved(): PluginLibraryResult {try{return {success:true,profiles:this.library.list(),directory:this.library.directory}}catch(e){return {success:false,code:e instanceof PresetError?e.code:'storage'}}}
   saveNamed(name: unknown, revision: unknown): PluginLibraryResult {try{const saved=this.locked(()=>{const state=this.readState();if(revision!==state.revision)throw new PresetError('stale');return this.library.save(name,state.values)});return {success:true,profiles:this.library.list(),directory:this.library.directory,savedId:saved.id}}catch(e){return {success:false,code:e instanceof PresetError?e.code:e instanceof ControlError&&e.code==='busy'?'busy':'storage'}}}
   select(profile: unknown): PluginResult { return this.result(() => {

@@ -1,0 +1,15 @@
+.astral-update-banner {flex-shrink:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;min-height:68px;padding:12px 24px;border-bottom:1px solid #353047;background:linear-gradient(90deg,rgba(6,182,212,.06),rgba(67,56,202,.09) 54%,rgba(168,85,247,.07));}
+.astral-update-mark {width:34px;height:34px;display:grid;place-items:center;border:1px solid #575077;border-radius:8px;background:rgba(90,76,210,.12);color:#c9c2ff;}
+.astral-update-copy {min-width:0;display:grid;gap:4px;}
+.astral-update-copy>span {font-size:10px;color:#a2abc1;letter-spacing:.07em;text-transform:uppercase;}
+.astral-update-copy strong {font-size:13px;font-weight:600;color:#e6e7ee;overflow-wrap:anywhere;}
+.astral-update-actions {display:flex;align-items:center;gap:8px;}
+.astral-update-primary,.astral-update-dismiss {min-height:34px;border:1px solid #575077;border-radius:7px;background:#0b0d12;color:#e6e7ee;cursor:pointer;}
+.astral-update-primary {padding:0 14px;font-size:12px;background:linear-gradient(135deg,rgba(79,70,229,.3),rgba(126,34,206,.28));}
+.astral-update-dismiss {width:34px;display:grid;place-items:center;border-color:#303440;}
+.astral-update-primary:disabled {cursor:default;opacity:.65;}
+.astral-update-banner button:focus-visible {outline:2px solid #a78bfa;outline-offset:3px;}
+.astral-update-progress {position:relative;width:min(300px,calc(100% - 45px));height:3px;margin-top:5px;background:#242735;border-radius:4px;}
+.astral-update-progress i {display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#22d3ee,#8b5cf6);}
+.astral-update-progress small {position:absolute;left:calc(100% + 8px);top:-6px;font-size:10px;color:#a2abc1;}
+@media(max-width:760px){.astral-update-banner{padding:12px 16px;gap:10px;}.astral-update-actions{grid-column:2 / -1;flex-wrap:wrap;}}

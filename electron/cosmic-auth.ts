@@ -42,12 +42,17 @@ export function createCosmicAuth(options:CosmicAuthOptions){
    server.listen(51789,'127.0.0.1',()=>void shell.openExternal(url.toString()).catch(()=>finish(Error('BROWSER_FAILED'))))
   })
  })
- const authorizedSession=()=>run(async()=>{
+ let sessionCheck:Promise<{user:CosmicAccount;token:string}>|undefined
+ const authorizedSession=()=>sessionCheck??=(run(async()=>{
   const epoch=generation;if(!safeStorage.isEncryptionAvailable())throw Error('ENCRYPTION_UNAVAILABLE')
   const session=JSON.parse(safeStorage.decryptString(await fs.readFile(file))) as Session
   if(!session.credentials||!Number.isFinite(session.createdAt)||session.createdAt>Date.now()||Date.now()-session.createdAt>30*86400000)throw Error('SESSION_EXPIRED')
-  if(session.credentials.expiresAt<=Date.now()+60000)session.credentials=await credentials(new URLSearchParams({client_id:clientId,grant_type:'refresh_token',refresh_token:session.credentials.refreshToken}))
-  const user=await verify(session.credentials.accessToken);await save(session,epoch);return {user,token:session.credentials.accessToken}
- })
+  if(session.credentials.expiresAt<=Date.now()+60000){
+   session.credentials=await credentials(new URLSearchParams({client_id:clientId,grant_type:'refresh_token',refresh_token:session.credentials.refreshToken}))
+   // Persist rotated credentials before a separate network verification can fail.
+   await save(session,epoch)
+  }
+  const user=await verify(session.credentials.accessToken);if(epoch!==generation)throw Error('SESSION_CANCELLED');return {user,token:session.credentials.accessToken}
+ })).finally(()=>{sessionCheck=undefined})
  return {login,checkSession:async()=>(await authorizedSession()).user,authorizeDownload:async()=>(await authorizedSession()).token,logout:async()=>{generation++;cancel?.();await fs.rm(file,{force:true})}}
 }

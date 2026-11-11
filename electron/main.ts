@@ -1,4 +1,6 @@
+import {pickerUpdateBlocked} from './updater'
 import {createPluginTransfer} from './plugin-transfer'
+import {createCommunity} from './community'
 import {v5SlotIndex,setV5Route} from './v5-routing'
 import {runDiagnostics} from './diagnostics'
 import {audioLocalTest} from './local-test-mode'
@@ -14,6 +16,13 @@ import { LEGACY_DEVICE_NAME, MAIN_CONFIG_FILE, V5_DEVICE_NAME } from './astral-p
 import { runPendingMigrations } from './migrations'
 import { attachUpdaterWindow, initializeAutoUpdater, publishMigrationStatus } from './updater'
 
+const registerPickerHandler = ipcMain.handle.bind(ipcMain)
+function handlePicker(channel: string, listener: Parameters<typeof ipcMain.handle>[1]) {
+ registerPickerHandler(channel,(event,...args)=>{
+  if(pickerUpdateBlocked() && !/^(audio-access-|window-)/.test(channel)) throw Error('UPDATE_REQUIRED')
+  return listener(event,...args)
+ })
+}
 const CONFIG_PATH = 'C:\\Program Files\\EqualizerAPO\\config'
 const CONFIG_FILE = path.join(CONFIG_PATH, 'config.txt')
 const AT_V2_FILE = path.join(CONFIG_PATH, 'at_v2.txt')
@@ -141,7 +150,7 @@ function readConfigState(): ConfigState {
   return state
 }
 
-ipcMain.handle('get-config-state', () => readConfigState())
+handlePicker('get-config-state', () => readConfigState())
 
 // Update main config (config.txt)
 function updateMainConfig(selection: 'none' | 'v1' | 'v2' | 'aiwv2' | 'aiwv5' | 'custom'): boolean {
@@ -281,7 +290,7 @@ Write-Output "OK"
   })
 }
 
-ipcMain.handle('set-main-config', async (_event, selection: 'none' | 'v1' | 'v2' | 'aiwv2' | 'aiwv5' | 'custom') => {
+async function setMainProfile(selection: 'none' | 'v1' | 'v2' | 'aiwv2' | 'aiwv5' | 'custom') {
   if (!['none','v1','v2','aiwv2','aiwv5','custom'].includes(selection)) return {success:false,state:readConfigState(),code:'INVALID_PROFILE'}
   if (selection === 'custom') { try { await audioAccess.requireReady() } catch { return {success:false,state:readConfigState(),code:'LOGIN_REQUIRED'} } }
   if (selection === 'custom' && !fs.existsSync(CUSTOM_OUTPUT_DLL)) return {success:false,state:readConfigState(),code:'CUSTOM_OUTPUT_NOT_INSTALLED'}
@@ -303,15 +312,16 @@ ipcMain.handle('set-main-config', async (_event, selection: 'none' | 'v1' | 'v2'
   const state = readConfigState()
   if (success && routed && selection === 'aiwv5') state.mainConfig = 'aiwv5'
   return { success: success && routed, state, code: routed ? undefined : 'AUDIO_ENDPOINT_SWITCH_FAILED' }
-})
+}
+handlePicker('set-main-config', (_event, selection) => setMainProfile(selection))
 
-ipcMain.handle('set-v2-sub', async (_event, subKey: string) => {
+handlePicker('set-v2-sub', async (_event, subKey: string) => {
   const success = updateV2Sub(subKey)
   if (success) await restartHiFiCable()
   return { success, state: readConfigState() }
 })
 
-ipcMain.handle('check-config-exists', () => {
+handlePicker('check-config-exists', () => {
   return fs.existsSync(CONFIG_FILE)
 })
 
@@ -356,7 +366,7 @@ function getAudioDevices(): Promise<AudioDevice[]> {
   })
 }
 
-ipcMain.handle('get-audio-devices', () => getAudioDevices())
+handlePicker('get-audio-devices', () => getAudioDevices())
 
 // Loudness Equalization control for the legacy 7.1 cable.
 interface LoudnessSettings {
@@ -411,9 +421,9 @@ function setLoudnessReleaseTime(deviceId: string, value: number): Promise<boolea
   return runElevatedAudioTask('AstralSetLoudnessRelease.ps1', script)
 }
 
-ipcMain.handle('get-loudness-settings', (_event, deviceId: string) => getLoudnessSettings(deviceId))
-ipcMain.handle('set-loudness-enabled', (_event, deviceId: string, enabled: boolean) => setLoudnessEnabled(deviceId, enabled))
-ipcMain.handle('set-loudness-release-time', (_event, deviceId: string, value: number) => setLoudnessReleaseTime(deviceId, value))
+handlePicker('get-loudness-settings', (_event, deviceId: string) => getLoudnessSettings(deviceId))
+handlePicker('set-loudness-enabled', (_event, deviceId: string, enabled: boolean) => setLoudnessEnabled(deviceId, enabled))
+handlePicker('set-loudness-release-time', (_event, deviceId: string, value: number) => setLoudnessReleaseTime(deviceId, value))
 
 function runElevatedAudioTask(filename: string, script: string): Promise<boolean> {
   const scriptPath = path.join(app.getPath('temp'), filename)
@@ -423,15 +433,15 @@ function runElevatedAudioTask(filename: string, script: string): Promise<boolean
   return new Promise(resolve => exec(command, error => resolve(!error)))
 }
 
-ipcMain.handle('restart-audio-device', async (_event, deviceId: string) => {
+handlePicker('restart-audio-device', async (_event, deviceId: string) => {
   if (!deviceId || deviceId.length > 1000) return false
   const escapedId = deviceId.replaceAll("'", "''")
   return runElevatedAudioTask('AstralRestartAudioDevice.ps1', `$ErrorActionPreference = 'Stop'\n$device = Get-PnpDevice -InstanceId '${escapedId}' -ErrorAction Stop\nDisable-PnpDevice -InstanceId $device.InstanceId -Confirm:$false -ErrorAction Stop\nStart-Sleep -Milliseconds 500\nEnable-PnpDevice -InstanceId $device.InstanceId -Confirm:$false -ErrorAction Stop\n`)
 })
 
-ipcMain.handle('restart-windows-audio', () => runElevatedAudioTask('AstralRestartAudioService.ps1', `$ErrorActionPreference = 'Stop'\nRestart-Service AudioEndpointBuilder -Force -ErrorAction Stop\nRestart-Service audiosrv -Force -ErrorAction Stop\n`))
+handlePicker('restart-windows-audio', () => runElevatedAudioTask('AstralRestartAudioService.ps1', `$ErrorActionPreference = 'Stop'\nRestart-Service AudioEndpointBuilder -Force -ErrorAction Stop\nRestart-Service audiosrv -Force -ErrorAction Stop\n`))
 
-ipcMain.handle('disable-voicemeeter-endpoints', () => runElevatedAudioTask('AstralDisableVoicemeeter.ps1', `
+handlePicker('disable-voicemeeter-endpoints', () => runElevatedAudioTask('AstralDisableVoicemeeter.ps1', `
 $ErrorActionPreference = 'Stop'
 $nameKey = '{a45c254e-df1c-4efd-8020-67d146a850e0},2'
 $roots = @(
@@ -460,7 +470,7 @@ Restart-Service audiosrv -Force -ErrorAction Stop
 Write-Output "Disabled $changed Voicemeeter endpoints."
 `))
 
-ipcMain.handle('open-eapo-device-selector', async () => {
+handlePicker('open-eapo-device-selector', async () => {
   const selectorPath = 'C:\\Program Files\\EqualizerAPO\\DeviceSelector.exe'
   if (!fs.existsSync(selectorPath)) return false
   return (await shell.openPath(selectorPath)) === ''
@@ -583,8 +593,8 @@ async function setChannelConfig(channelConfig: 'stereo' | '7.1'): Promise<boolea
   })
 }
 
-ipcMain.handle('get-channel-config', () => getChannelConfig())
-ipcMain.handle('set-channel-config', (_event, channelConfig: 'stereo' | '7.1') => setChannelConfig(channelConfig))
+handlePicker('get-channel-config', () => getChannelConfig())
+handlePicker('set-channel-config', (_event, channelConfig: 'stereo' | '7.1') => setChannelConfig(channelConfig))
 
 // ============ FILTER SELECTOR (EQ Files) ============
 
@@ -862,20 +872,20 @@ function setPreampSettings(filterName: string, enabled: boolean, value: number, 
 }
 
 // IPC handlers with config version support
-ipcMain.handle('get-filter-files', (_event, configVersion: 'v1' | 'aiwv2' = 'v1') => getFilterFiles(configVersion))
-ipcMain.handle('get-auto-eq-library', () => getAutoEqLibrary())
-ipcMain.handle('get-current-filter', (_event, configVersion: 'v1' | 'aiwv2' = 'v1') => getCurrentFilter(configVersion))
-ipcMain.handle('set-current-filter', (_event, filterName: string, configVersion: 'v1' | 'aiwv2' = 'v1') => setCurrentFilter(filterName, configVersion))
-ipcMain.handle('get-preamp-settings', (_event, filterName: string, configVersion: 'v1' | 'aiwv2' | 'aiwv5' = 'v1') => getPreampSettings(filterName, configVersion))
-ipcMain.handle('set-preamp-settings', (_event, filterName: string, enabled: boolean, value: number, configVersion: 'v1' | 'aiwv2' | 'aiwv5' = 'v1') => setPreampSettings(filterName, enabled, value, configVersion))
+handlePicker('get-filter-files', (_event, configVersion: 'v1' | 'aiwv2' = 'v1') => getFilterFiles(configVersion))
+handlePicker('get-auto-eq-library', () => getAutoEqLibrary())
+handlePicker('get-current-filter', (_event, configVersion: 'v1' | 'aiwv2' = 'v1') => getCurrentFilter(configVersion))
+handlePicker('set-current-filter', (_event, filterName: string, configVersion: 'v1' | 'aiwv2' = 'v1') => setCurrentFilter(filterName, configVersion))
+handlePicker('get-preamp-settings', (_event, filterName: string, configVersion: 'v1' | 'aiwv2' | 'aiwv5' = 'v1') => getPreampSettings(filterName, configVersion))
+handlePicker('set-preamp-settings', (_event, filterName: string, enabled: boolean, value: number, configVersion: 'v1' | 'aiwv2' | 'aiwv5' = 'v1') => setPreampSettings(filterName, enabled, value, configVersion))
 
 // AIW V5 is a separate 16-channel chain. These read-only discovery handlers
 // intentionally do not assume the final library location; the path resolver
 // supports the current reference layout and the two planned layouts.
-ipcMain.handle('get-v5-readiness', () => getV5Readiness())
-ipcMain.handle('get-v5-presets', () => listV5Presets())
-ipcMain.handle('get-headphone-eqs', () => listHeadphoneEqs())
-ipcMain.handle('search-headphone-eqs', (_event, query: string, limit?: number, type?: string) => searchHeadphoneEqs(query, limit, type))
+handlePicker('get-v5-readiness', () => getV5Readiness())
+handlePicker('get-v5-presets', () => listV5Presets())
+handlePicker('get-headphone-eqs', () => listHeadphoneEqs())
+handlePicker('search-headphone-eqs', (_event, query: string, limit?: number, type?: string) => searchHeadphoneEqs(query, limit, type))
 
 function readV5Include(slot: V5IncludeSlot): string | null {
   if (!fs.existsSync(MAIN_CONFIG_FILE)) return null
@@ -885,7 +895,7 @@ function readV5Include(slot: V5IncludeSlot): string | null {
 
 }
 
-ipcMain.handle('get-v5-active-state', () => {
+handlePicker('get-v5-active-state', () => {
   const tuneInclude = readV5Include('tune')
   const headphoneInclude = readV5Include('headphone')
   let headphoneName: string | null = null
@@ -953,7 +963,7 @@ function restartV5Cable(): Promise<boolean> {
   }))
 }
 
-ipcMain.handle('set-v5-preset', async (_event, filename: string) => {
+handlePicker('set-v5-preset', async (_event, filename: string) => {
   const preset = resolveV5Preset(filename)
   if (!preset) return { success: false, code: 'V5_PRESET_NOT_FOUND' }
   const success = updateV5Include('tune', preset)
@@ -962,7 +972,7 @@ ipcMain.handle('set-v5-preset', async (_event, filename: string) => {
   return { success: true, restarted }
 })
 
-ipcMain.handle('set-v5-headphone-eq', async (event, relativePath: string) => {
+handlePicker('set-v5-headphone-eq', async (event, relativePath: string) => {
   const headphoneEq = resolveHeadphoneEq(relativePath)
   if (!headphoneEq) return { success: false, code: 'HEADPHONE_EQ_NOT_FOUND' }
   const generatedEqs = await generateHeadphoneEqSet(headphoneEq, progress => {
@@ -980,7 +990,7 @@ ipcMain.handle('set-v5-headphone-eq', async (event, relativePath: string) => {
   return { success: true, restarted, autoEq: generatedEqs.aiwV5, generatedEqs }
 })
 
-ipcMain.handle('apply-saved-headphone-eq', async (_event, profile: 'atV1' | 'aiwV3' | 'aiwV5', filename: string) => {
+handlePicker('apply-saved-headphone-eq', async (_event, profile: 'atV1' | 'aiwV3' | 'aiwV5', filename: string) => {
   if (path.basename(filename) !== filename || !filename.toLocaleLowerCase().endsWith('.txt')) return { success: false, code: 'INVALID_EQ_FILE' }
   const folder = profile === 'atV1' ? EQ_V2_FOLDER : profile === 'aiwV3' ? EQ_V3_FOLDER : EQ_V5_FOLDER
   const absoluteFile = path.join(folder, filename)
@@ -996,7 +1006,7 @@ ipcMain.handle('apply-saved-headphone-eq', async (_event, profile: 'atV1' | 'aiw
   return { success: true, restarted }
 })
 
-ipcMain.handle('delete-saved-headphone-eq', (_event, files: Partial<Record<'atV1' | 'aiwV3' | 'aiwV5', string>>) => {
+handlePicker('delete-saved-headphone-eq', (_event, files: Partial<Record<'atV1' | 'aiwV3' | 'aiwV5', string>>) => {
   const folders = { atV1: EQ_V2_FOLDER, aiwV3: EQ_V3_FOLDER, aiwV5: EQ_V5_FOLDER } as const
   const validProfiles = new Set(Object.keys(folders))
   const rawEntries = Object.entries(files ?? {})
@@ -1039,21 +1049,41 @@ ipcMain.handle('delete-saved-headphone-eq', (_event, files: Partial<Record<'atV1
 
 // Plugin controls use a separate shared profile, not legacy APO routing files.
 const pluginControl = new PluginControlStore(pluginControlDirectory())
+const community = createCommunity({
+  store:pluginControl,
+  request:(route,init)=>audioAccess.communityRequest(route,init),
+  isCosmicActive:()=>readConfigState().mainConfig==='custom',
+  activateCosmic:async()=>{
+    await audioAccess.requireReady()
+    const previous=readConfigState().mainConfig
+    if(previous==='custom')return async()=>{}
+    const result=await setMainProfile('custom')
+    if(!result.success)throw Error(result.code || 'COSMIC_NOT_ACTIVE')
+    return async()=>{if(readConfigState().mainConfig==='custom'){const rollback=await setMainProfile(previous);if(!rollback.success)throw Error('ROUTE_RESTORE_FAILED')}}
+  },
+})
+handlePicker('community-list',(_event,query)=>community.list(query))
+handlePicker('community-publish',(_event,publication)=>community.publish(publication))
+handlePicker('community-apply',(_event,id)=>community.apply(id))
+handlePicker('community-undo',()=>community.undo())
+handlePicker('community-favorite',(_event,id,saved)=>community.favorite(id,saved))
+handlePicker('community-report',(_event,id,reason)=>community.report(id,reason))
+handlePicker('community-remove',(_event,id)=>community.remove(id))
 const pluginTransfer=createPluginTransfer(pluginControl.library,()=>win)
-ipcMain.handle('import-plugin-preset',()=>pluginTransfer.import())
-ipcMain.handle('export-plugin-preset',(_event,id:unknown)=>pluginTransfer.export(id))
-ipcMain.handle('list-plugin-presets', () => pluginControl.listSaved())
-ipcMain.handle('save-plugin-preset', (_event, name: unknown, revision: unknown) => pluginControl.saveNamed(name, revision))
-ipcMain.handle('load-plugin-preset', (_event, id: unknown) => pluginControl.loadSaved(id))
-ipcMain.handle('builtin-plugin-preset', (_event, id: unknown) => pluginControl.builtin(id))
-ipcMain.handle('get-plugin-control', () => pluginControl.get())
-ipcMain.handle('patch-plugin-control', (_event, patch: unknown) => pluginControl.patch(patch))
-ipcMain.handle('select-plugin-profile', (_event, profile: unknown) => pluginControl.select(profile))
+handlePicker('import-plugin-preset',()=>pluginTransfer.import())
+handlePicker('export-plugin-preset',(_event,id:unknown)=>pluginTransfer.export(id))
+handlePicker('list-plugin-presets', () => pluginControl.listSaved())
+handlePicker('save-plugin-preset', (_event, name: unknown, revision: unknown) => pluginControl.saveNamed(name, revision))
+handlePicker('load-plugin-preset', (_event, id: unknown) => pluginControl.loadSaved(id))
+handlePicker('builtin-plugin-preset', (_event, id: unknown) => pluginControl.builtin(id))
+handlePicker('get-plugin-control', () => pluginControl.get())
+handlePicker('patch-plugin-control', (_event, patch: unknown) => pluginControl.patch(patch))
+handlePicker('select-plugin-profile', (_event, profile: unknown) => pluginControl.select(profile))
 
-ipcMain.handle('audio-access-status',()=>audioAccess.start())
-ipcMain.handle('audio-access-login',()=>audioAccess.login())
-ipcMain.handle('audio-access-retry',()=>audioAccess.retry())
-ipcMain.handle('audio-access-logout',()=>audioAccess.logout())
+handlePicker('audio-access-status',()=>audioAccess.start())
+handlePicker('audio-access-login',()=>audioAccess.login())
+handlePicker('audio-access-retry',()=>audioAccess.retry())
+handlePicker('audio-access-logout',()=>audioAccess.logout())
 
 let diagnosticsRun: ReturnType<typeof runDiagnostics> | undefined
-ipcMain.handle('run-audio-diagnostics',()=>diagnosticsRun??=(runDiagnostics().finally(()=>{diagnosticsRun=undefined})))
+handlePicker('run-audio-diagnostics',()=>diagnosticsRun??=(runDiagnostics().finally(()=>{diagnosticsRun=undefined})))

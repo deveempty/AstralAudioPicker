@@ -13,6 +13,8 @@ export interface ConfigResult {
 
 export type UpdatePhase = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'migrating' | 'error' | 'development'
 export interface UpdateStatus {
+  required?: boolean
+  minimumVersion?: string
   phase: UpdatePhase
   version?: string
   progress?: number
@@ -131,3 +133,4 @@ export interface V5ActiveState {
 }
 
 export type { PluginLibraryResult, BuiltinPluginProfile, PluginParameterId, PluginProfile, PluginResult, PluginSnapshot } from '../../shared/plugin-control'
+export type { CommunityAPI, CommunityProfile, CommunityPublication, CommunityQuery, CommunityResult } from '../../shared/community'

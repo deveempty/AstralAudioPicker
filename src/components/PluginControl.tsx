@@ -5,6 +5,9 @@ import AstralButton from './ui/AstralButton'
 import AstralSelect from './ui/AstralSelect'
 import StatusTag from './ui/StatusTag'
 import { useI18n, type TranslationKey } from '../i18n'
+import type { CommunityProfile } from '../../shared/community'
+import { savedCommunityLibrary } from '../community-library'
+import { communityErrorKey } from '../community-errors'
 import { builtinPluginProfiles, builtinPluginValues, samePluginValues, physicalValue, pluginParameters, type BuiltinPluginProfile, type SavedPluginProfile, type PluginLibraryResult, type PluginParameterId, type PluginProfile, type PluginResult, type PluginSnapshot } from '../../shared/plugin-control'
 type Patch = Partial<Record<PluginParameterId, number>>
 export default function PluginControl() {
@@ -15,6 +18,11 @@ export default function PluginControl() {
  const [error,setError]=useState<string|null>(null)
  const [saving,setSaving]=useState(false)
  const [library,setLibrary]=useState<SavedPluginProfile[]>([])
+ const [communityLibrary,setCommunityLibrary]=useState<CommunityProfile[]>([])
+ const [communityError,setCommunityError]=useState<TranslationKey|null>(null)
+ const [communityNotice,setCommunityNotice]=useState<TranslationKey|null>(null)
+ const [communityLoading,setCommunityLoading]=useState(true)
+ const [communityReload,setCommunityReload]=useState(0)
  const [selected,setSelected]=useState('')
  const [name,setName]=useState('')
  const [saveOpen,setSaveOpen]=useState(false)
@@ -35,6 +43,15 @@ export default function PluginControl() {
  }
  const change=(id: PluginParameterId,value: number)=>{if(actionRunning.current)return;setNotice(null);setDraft(old=>({...old,[id]:value}));queued.current[id]=value;clearTimeout(timer.current);timer.current=setTimeout(()=>void flush(),100)}
  useEffect(()=>{
+  let cancelled=false
+  setCommunityLoading(true);setCommunityError(null)
+  void savedCommunityLibrary(query=>window.electronAPI.communityList(query),()=>cancelled)
+   .then(profiles=>{if(!cancelled)setCommunityLibrary(profiles)})
+   .catch(e=>{if(!cancelled)setCommunityError(communityErrorKey(e instanceof Error?e.message:''))})
+   .finally(()=>{if(!cancelled)setCommunityLoading(false)})
+  return()=>{cancelled=true}
+ },[communityReload])
+ useEffect(()=>{
   alive.current=true;let polling=false,listing=false
   const refresh=async()=>{if(polling)return;polling=true;try{apply(await window.electronAPI.getPluginControl())}catch{if(alive.current)setError('storage')}finally{polling=false}}
   const refreshLibrary=async()=>{if(listing)return;listing=true;try{acceptLibrary(await window.electronAPI.listPluginPresets())}catch{if(alive.current)setPresetError('storage')}finally{listing=false}}
@@ -45,7 +62,19 @@ export default function PluginControl() {
  const select=(profile:PluginProfile)=>action(async()=>{apply(await window.electronAPI.selectPluginProfile(profile))})
  const builtin=(id:BuiltinPluginProfile)=>action(async()=>{const result=await window.electronAPI.applyBuiltinPluginPreset(id);apply(result);if(result.success){setSelected('');setNotice('loaded')}})
  const save=(saveName=name.trim())=>action(async()=>{if(!snapshot)return;const result=await window.electronAPI.savePluginPreset(saveName,snapshot.state.revision);acceptLibrary(result);if(result.success){setNotice('saved');setSaveOpen(false)}})
- const load=()=>action(async()=>{const result=await window.electronAPI.loadPluginPreset(selected);apply(result);if(result.success)setNotice('loaded');else setPresetError(result.code)})
+ const load=()=>action(async()=>{
+  setCommunityError(null);setCommunityNotice(null)
+  if(selected.startsWith('community:')){
+   const result=await window.electronAPI.communityApply(selected.slice('community:'.length))
+   if(!alive.current)return
+   if(!result.success){setCommunityError(communityErrorKey(result.code));return}
+   apply(await window.electronAPI.getPluginControl())
+   setCommunityNotice(result.data.engineConfirmed?'community.applied':'community.appliedPending')
+   window.dispatchEvent(new Event('astral-config-changed'))
+   return
+  }
+  const result=await window.electronAPI.loadPluginPreset(selected);apply(result);if(result.success)setNotice('loaded');else setPresetError(result.code)
+ })
  const transfer=(kind:'import'|'export')=>action(async()=>{const result=await(kind==='import'?window.electronAPI.importPluginPreset():window.electronAPI.exportPluginPreset(selected));if(!result.success){setPresetError(result.code);return}if(result.canceled)return;if(result.library)acceptLibrary(result.library);setNotice(kind==='import'?'imported':'exported')})
  if(!snapshot)return <Text role="status" color={error?'red.300':'whiteAlpha.500'}>{t(error?'plugin.error.storage':'plugin.loading')}</Text>
  const {state}=snapshot
@@ -62,13 +91,16 @@ export default function PluginControl() {
 
    <Text mt="2" fontSize="xs" color="whiteAlpha.700">{t('cosmic.experiment')}</Text>
    <Flex mt="3" gap="2" align="center" flexWrap="wrap">
-    <Box flex="1" minW="180px"><AstralSelect ariaLabel={t('plugin.savedSelect')} placeholder={t('plugin.savedSelect')} value={selected} disabled={dirty} options={library.map(p=>({value:p.id,label:p.name}))} onChange={id=>{setSelected(id);setNotice(null)}} /></Box>
-    <AstralButton disabled={dirty||!library.some(p=>p.id===selected)} variant="secondary" onClick={()=>void load()}>{t('plugin.load')}</AstralButton>
+    <Box flex="1" minW="180px"><AstralSelect ariaLabel={t('plugin.savedSelect')} placeholder={t('plugin.savedSelect')} value={selected} disabled={dirty} options={[...library.map(p=>({value:p.id,label:p.name})),...communityLibrary.map(p=>({value:'community:'+p.id,label:p.name,description:t('community.presetAuthor',{author:p.author})}))]} onChange={id=>{setSelected(id);setNotice(null);setCommunityNotice(null)}} /></Box>
+    <AstralButton disabled={dirty||!(library.some(p=>p.id===selected)||communityLibrary.some(p=>'community:'+p.id===selected))} variant="secondary" onClick={()=>void load()}>{t('plugin.load')}</AstralButton>
     <AstralButton variant="secondary" disabled={dirty} onClick={()=>{setName('');setSaveOpen(v=>!v)}}>{t('cosmic.saveAs')}</AstralButton>
     <AstralButton disabled={dirty||!selected||!library.some(p=>p.id===selected)} variant="ghost" onClick={()=>{const target=library.find(p=>p.id===selected);if(target)void save(target.name)}}>{t('plugin.updatePreset')}</AstralButton>
    </Flex>
    <Flex mt="3" gap="2" flexWrap="wrap"><AstralButton size="sm" variant="secondary" disabled={dirty} onClick={()=>void transfer('import')}>{t('plugin.import')}</AstralButton><AstralButton size="sm" variant="secondary" disabled={dirty||!library.some(p=>p.id===selected)} title={t('plugin.exportHelp')} onClick={()=>void transfer('export')}>{t('plugin.export')}</AstralButton></Flex>
-   {selected?<Text mt="2" fontSize="xs" color="whiteAlpha.700">{t('cosmic.updateTarget',{name:library.find(p=>p.id===selected)?.name??''})}</Text>:null}
+   {selected.startsWith('community:')?<Text mt="2" fontSize="xs" color="whiteAlpha.700">{t('community.presetCopyHelp')}</Text>:selected?<Text mt="2" fontSize="xs" color="whiteAlpha.700">{t('cosmic.updateTarget',{name:library.find(p=>p.id===selected)?.name??''})}</Text>:null}
+   {communityLoading?<Text mt="2" fontSize="xs" role="status" color="whiteAlpha.500">{t('community.loadingSaved')}</Text>:null}
+   {communityError?<Box mt="2"><Text fontSize="xs" role="alert" color="red.300">{t(communityError)}</Text><AstralButton size="sm" variant="ghost" disabled={dirty||communityLoading} onClick={()=>setCommunityReload(v=>v+1)}>{t('community.refresh')}</AstralButton></Box>:null}
+   {communityNotice?<Text mt="2" fontSize="xs" role="status" color="purple.200">{t(communityNotice)}</Text>:null}
    {saveOpen?<Box mt="3" p="3" bg="whiteAlpha.50" borderRadius="8px">
     <label htmlFor="cosmic-preset-name">{t('plugin.presetName')}</label>
     <Flex mt="2" gap="2" align="center" flexWrap="wrap"><Input id="cosmic-preset-name" autoFocus h="42px" px="3" flex="1" minW="180px" bg="#100d13" color="white" border="1px solid rgba(255,255,255,.22)" borderRadius="8px" _focusVisible={{borderColor:'purple.400',outline:'2px solid rgba(155,77,255,.25)',outlineOffset:'2px'}} aria-label={t('plugin.presetName')} placeholder={t('cosmic.nameExample')} value={name} maxLength={64} disabled={saving} onChange={e=>setName(e.target.value)} onKeyDown={e=>{if(e.key==='Escape')setSaveOpen(false);if(e.key==='Enter'&&!dirty&&name.trim()&&!existingName){e.preventDefault();void save()}}}/><AstralButton disabled={dirty||!name.trim()||existingName} onClick={()=>void save()}>{t('plugin.savePreset')}</AstralButton><AstralButton variant="ghost" onClick={()=>setSaveOpen(false)}>{t('cosmic.cancel')}</AstralButton></Flex>

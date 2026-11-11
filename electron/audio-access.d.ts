@@ -5,5 +5,6 @@ export declare function createAudioAccess(configFile: string): {
     login: () => Promise<AudioAccessStatus>;
     retry: () => Promise<AudioAccessStatus>;
     requireReady: () => Promise<void>;
+    communityRequest: (_route: string, _init?: RequestInit) => Promise<Response>;
     logout: () => Promise<AudioAccessStatus>;
 };

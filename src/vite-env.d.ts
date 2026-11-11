@@ -30,7 +30,7 @@ declare global {
   const __APP_VERSION__: string
 
   interface Window {
-    electronAPI: {
+    electronAPI: import('../shared/community').CommunityAPI & {
       importPluginPreset: () => Promise<import('../shared/plugin-control').PluginTransferResult>
       exportPluginPreset: (id:string) => Promise<import('../shared/plugin-control').PluginTransferResult>
       runAudioDiagnostics: () => Promise<import('../shared/diagnostics').DiagnosticReport>

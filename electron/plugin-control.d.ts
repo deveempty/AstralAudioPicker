@@ -16,6 +16,8 @@ export declare class PluginControlStore {
     private replaceValues;
     builtin(id: unknown): PluginResult;
     loadSaved(id: unknown): PluginResult;
+    applyCommunity(values: unknown, expectedRevision: number): PluginResult;
+    undoCommunity(): PluginResult;
     listSaved(): PluginLibraryResult;
     saveNamed(name: unknown, revision: unknown): PluginLibraryResult;
     select(profile: unknown): PluginResult;
