@@ -33,6 +33,9 @@ let win: BrowserWindow | null = null
 
 function createWindow() {
   win = new BrowserWindow({
+    icon: app.isPackaged
+      ? path.join(process.resourcesPath, 'branding', 'appicon.ico')
+      : path.join(app.getAppPath(), 'src', 'assets', 'appicon.ico'),
     width: 1550,
     height: 1000,
     frame: false,

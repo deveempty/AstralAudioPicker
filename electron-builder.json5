@@ -11,6 +11,10 @@
   ],
   "extraResources": [
     {
+      "from": "src/assets/appicon.ico",
+      "to": "branding/appicon.ico"
+    },
+    {
       "from": "electron/scripts",
       "to": "scripts",
       "filter": ["**/*"]
@@ -27,6 +31,8 @@
     "requestedExecutionLevel": "requireAdministrator"
   },
   "nsis": {
+    "installerIcon": "src/assets/appicon.ico",
+    "uninstallerIcon": "src/assets/appicon.ico",
     "oneClick": true,
     "perMachine": true,
     "allowElevation": true,
