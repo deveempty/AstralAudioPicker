@@ -25,7 +25,7 @@ if (JSON.stringify(packagedRoots) !== JSON.stringify(['dist', 'dist-electron']))
 
 for (const resource of builder.extraResources || []) {
   const normalized = String(resource.from || '').replaceAll('\\', '/').toLowerCase()
-  if (normalized === 'src/assets/appicon.ico' && resource.to === 'branding/appicon.ico') continue
+  if (normalized === 'src/assets/appicon.ico' && ['branding/appicon.ico', 'branding/shortcut-${version}.ico'].includes(resource.to)) continue
   if (!['electron/scripts', 'electron/tools'].includes(normalized)) errors.push(`Unexpected extraResources source: ${resource.from}`)
 }
 

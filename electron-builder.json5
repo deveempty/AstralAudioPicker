@@ -15,6 +15,10 @@
       "to": "branding/appicon.ico"
     },
     {
+      "from": "src/assets/appicon.ico",
+      "to": "branding/shortcut-${version}.ico"
+    },
+    {
       "from": "electron/scripts",
       "to": "scripts",
       "filter": ["**/*"]
@@ -31,6 +35,7 @@
     "requestedExecutionLevel": "requireAdministrator"
   },
   "nsis": {
+    "include": "scripts/shortcut-icons.nsh",
     "installerIcon": "src/assets/appicon.ico",
     "uninstallerIcon": "src/assets/appicon.ico",
     "oneClick": true,
