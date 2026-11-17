@@ -43,7 +43,7 @@ export interface AutoEqLibraryGroup {
   label: 'AT V1' | 'AIW V3' | 'AIW V5'
   folder: 'v2' | 'v3' | 'v5'
   activeFilename: string | null
-  files: Array<{ name: string; headphoneName: string; source: string | null; filename: string; target: string | null }>
+  files: Array<{ name: string; headphoneName: string; source: string | null; sourceFile?: string | null; filename: string; target: string | null }>
 }
 
 export type EqProfile = 'atV1' | 'aiwV3' | 'aiwV5'

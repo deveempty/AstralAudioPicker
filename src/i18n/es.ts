@@ -510,4 +510,5 @@ export const es: Record<keyof typeof en, string> = {
   "plugin.error.stale": "La configuración cambió antes de guardarla. Revísala y vuelve a guardar.",
 "profiles.endpointFailed": "No se pudieron cambiar las salidas VB-Cable. Comprueba que est\u00e9n instalados los dispositivos 7.1 y de 16 canales. Se restaur\u00f3 el perfil anterior.",
   "profiles.configFailed": "No se pudo guardar la configuraci\u00f3n de Equalizer APO. Comprueba la instalaci\u00f3n de audio y los permisos de escritura.",
+  'eq.automaticGameTarget': "La EQ se adapta al juego seleccionado",
 }

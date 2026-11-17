@@ -1,5 +1,5 @@
 import {switchVerifiedCable} from './cable-switch'
-import {matchingGameEq} from './v5-game-eq'
+import {matchingGameEq,initialGameEq,selectedHeadphone,gameEqForHeadphone,headphoneSource} from './v5-game-eq'
 import {parseV5Preset} from '../shared/v5-catalog'
 import {updateEndpointIcons} from './endpoint-icons'
 import {createAudioUpgrade,preferredRelayEdition} from './audio-upgrade'
@@ -750,7 +750,7 @@ function getAutoEqLibrary() {
       ? (getCurrentFilter('v1') ? `${getCurrentFilter('v1')}.txt` : null)
       : group.id === 'aiwV3'
         ? (getCurrentFilter('aiwv2') ? `${getCurrentFilter('aiwv2')}.txt` : null)
-        : (readV5Include('headphone') ? path.basename(readV5Include('headphone')!) : null),
+        : (displayedV5Eq() ? path.basename(displayedV5Eq()!) : null),
     files: fs.existsSync(group.directory)
       ? fs.readdirSync(group.directory)
         .filter(filename => filename.toLocaleLowerCase().endsWith('.txt'))
@@ -762,7 +762,7 @@ function getAutoEqLibrary() {
           const sourceFile = content.match(/^# Source file:\s*(.+)$/mi)?.[1]?.trim() ?? null
           const sourceParts = sourceFile?.split(/[\\/]/).filter(Boolean) ?? []
           const source = sourceParts.length > 2 ? sourceParts[1] : null
-          return { name, headphoneName, source, filename, target }
+          return { name, headphoneName, source, sourceFile, filename, target }
         })
         .sort((left, right) => left.name.localeCompare(right.name))
       : [],
@@ -967,13 +967,29 @@ function readV5Include(slot: V5IncludeSlot): string | null {
   if (!fs.existsSync(MAIN_CONFIG_FILE)) return null
   const lines = fs.readFileSync(MAIN_CONFIG_FILE, 'utf8').split(/\r?\n/)
   const index=v5SlotIndex(lines,slot)
-  return index<0?null:lines[index].replace(/^\s*#?\s*Include:\s*/i,'').trim()
+  if(index<0)return null
+  const include=lines[index].replace(/^\s*#?\s*Include:\s*/i,'').trim()
+  const absolute=path.resolve(path.dirname(MAIN_CONFIG_FILE),include)
+  try{return fs.statSync(absolute).isFile()?include:null}catch{return null}
 
+}
+
+function currentHeadphoneAnchor():string|null {
+  const include=readV5Include('headphone')
+  const legacy=[['v1',EQ_V2_FOLDER],['aiwv2',EQ_V3_FOLDER]] as const
+  return selectedHeadphone(include?path.resolve(path.dirname(MAIN_CONFIG_FILE),include):null,
+    legacy.flatMap(([profile,folder])=>{const name=getCurrentFilter(profile);return name?[path.join(folder,name+'.txt')]:[]}))
+}
+function displayedV5Eq():string|null {
+  const include=readV5Include('headphone');if(include)return path.resolve(path.dirname(MAIN_CONFIG_FILE),include)
+  const anchor=currentHeadphoneAnchor();if(!anchor)return null
+  const game=parseV5Preset(path.basename(readV5Include('tune')??''))?.game??'BO7'
+  return gameEqForHeadphone(anchor,EQ_V5_FOLDER,game)
 }
 
 handlePicker('get-v5-active-state', () => {
   const tuneInclude = readV5Include('tune')
-  const headphoneInclude = readV5Include('headphone')
+  const headphoneInclude = displayedV5Eq()
   let headphoneName: string | null = null
   let headphoneSource: string | null = null
   let headphoneChannel: string | null = null
@@ -1024,7 +1040,7 @@ function updateV5Includes(files: Partial<Record<V5IncludeSlot, string>>): boolea
   const lines = fs.readFileSync(MAIN_CONFIG_FILE, 'utf8').split(/\r?\n/)
   const enabled=readConfigState().mainConfig==='aiwv5'
   for (const [slot, absoluteFile] of Object.entries(files)) {
-  if (!fs.existsSync(absoluteFile)) return false
+  if (!fs.existsSync(absoluteFile) || !fs.statSync(absoluteFile).isFile()) return false
   const relativeFile = path.relative(path.dirname(MAIN_CONFIG_FILE), absoluteFile).replaceAll('/', '\\')
   if (relativeFile.startsWith('..')) return false
 
@@ -1046,16 +1062,15 @@ function restartV5Cable(): Promise<boolean> {
   }))
 }
 
-handlePicker('set-v5-preset', async (event, filename: string, generate = false) => {
+handlePicker('set-v5-preset', async (event, filename: string, _generate = false) => {
   const preset = resolveV5Preset(filename)
   if (!preset) return { success: false, code: 'V5_PRESET_NOT_FOUND' }
   if(filename.startsWith('MW4_')&&!getV5Readiness().plugins.vstCharlie)return {success:false,code:'CHARLIE_NOT_INSTALLED'}
   const game = parseV5Preset(filename)!.game
-  const currentEq = readV5Include('headphone')
-  let eq = currentEq && matchingGameEq(path.resolve(path.dirname(MAIN_CONFIG_FILE), currentEq), game)
-  if (!eq && generate === true && currentEq) {
-    const currentFile=path.resolve(path.dirname(MAIN_CONFIG_FILE),currentEq)
-    const source=fs.existsSync(currentFile)?fs.readFileSync(currentFile,'utf8').match(/^# Source file:\s*(.+)$/mi)?.[1].trim():null
+  const currentEq = currentHeadphoneAnchor()
+  let eq = currentEq && gameEqForHeadphone(currentEq,EQ_V5_FOLDER,game)
+  if (!eq && currentEq) {
+    const source=headphoneSource(currentEq)
     const measurement=source && resolveHeadphoneEq(source)
     if(!measurement)return {success:false,code:'HEADPHONE_EQ_NOT_FOUND'}
     const generated=await generateBothGameEqs(measurement,game,p=>{if(!event.sender.isDestroyed())event.sender.send('auto-eq-progress',p)},true)
@@ -1082,7 +1097,7 @@ handlePicker('set-v5-headphone-eq', async (event, relativePath: string) => {
   const aiwV3Name = path.basename(generatedEqs.aiwV3.outputFile, '.txt')
   const success = setCurrentFilter(atV1Name, 'v1')
     && setCurrentFilter(aiwV3Name, 'aiwv2')
-    && (parseV5Preset(path.basename(readV5Include('tune') ?? ''))?.game !== v5Game || updateV5Include('headphone', generatedEqs.aiwV5.outputFile))
+    && ((!readV5Include('tune') || parseV5Preset(path.basename(readV5Include('tune') ?? ''))?.game === v5Game) ? updateV5Include('headphone', generatedEqs.aiwV5.outputFile) : true)
   if (!success) return { success: false, code: 'EQ_CONFIG_NOT_READY' }
   const restarts = await Promise.all([restartHiFiCable(), restartV5Cable()])
   const restarted = restarts.every(Boolean)
@@ -1096,9 +1111,8 @@ handlePicker('apply-saved-headphone-eq', async (_event, profile: 'atV1' | 'aiwV3
   if (!fs.existsSync(absoluteFile)) return { success: false, code: 'EQ_NOT_FOUND' }
   if (profile === 'aiwV5') {
     const game = parseV5Preset(path.basename(readV5Include('tune') ?? ''))?.game
-    const matching = game && matchingGameEq(absoluteFile, game)
+    const matching = game ? matchingGameEq(absoluteFile, game) : initialGameEq(absoluteFile)
     if (!matching) return { success: false, code: 'V5_GAME_EQ_REQUIRED' }
-    if(matching !== absoluteFile)return {success:false,code:'V5_GAME_MISMATCH'}
     absoluteFile = matching
   }
   const filterName = path.basename(filename, '.txt')

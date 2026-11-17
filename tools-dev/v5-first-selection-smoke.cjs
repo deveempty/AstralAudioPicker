@@ -1,0 +1,12 @@
+﻿const fs=require('fs'),path=require('path'),assert=require('assert/strict'),esbuild=require('esbuild');
+const root=path.resolve('output/v5-first-selection-'+Date.now());fs.mkdirSync(path.join(root,'data/eq/v5'),{recursive:true});
+const source=fs.readFileSync('electron/main.ts','utf8');let code=source.slice(source.indexOf('function readV5Include('),source.indexOf("handlePicker('get-v5-active-state'"));
+const routing=esbuild.transformSync(fs.readFileSync('electron/v5-routing.ts','utf8'),{loader:'ts',format:'cjs'}).code;const mod={exports:{}};new Function('module','exports',routing)(mod,mod.exports);
+const config=path.join(root,'config.txt');fs.writeFileSync(config,'# AIW V5:\nDevice: CABLE In 16ch\n# 16ch TUNE\nInclude: data/eq/v5\n# EQ\nInclude: data/eq/v5/\n');
+const read=new Function('fs','path','MAIN_CONFIG_FILE','v5SlotIndex',esbuild.transformSync(code,{loader:'ts'}).code+';return readV5Include')(fs,path,config,mod.exports.v5SlotIndex);
+assert.equal(read('headphone'),null);assert.equal(read('tune'),null);
+esbuild.buildSync({entryPoints:['electron/v5-game-eq.ts'],bundle:true,platform:'node',outfile:path.join(root,'eq.cjs')});const eq=require(path.join(root,'eq.cjs'));
+const bo7=path.join(root,'data/eq/v5/headphone.txt'),mw4=path.join(root,'data/eq/v5/headphone MW4.txt');fs.writeFileSync(bo7,'# Target: BO7 Target V5\n# Source file: same.txt\nPreamp: 0 dB');fs.writeFileSync(mw4,'# Target: MW4 Target V5\n# Source file: same.txt\nPreamp: 0 dB');
+assert.equal(eq.initialGameEq(bo7),bo7);assert.equal(eq.initialGameEq(mw4),mw4);assert.equal(eq.matchingGameEq(bo7,'MW4'),mw4);assert.equal(eq.matchingGameEq(path.dirname(bo7),'BO7'),null);
+fs.writeFileSync(config,fs.readFileSync(config,'utf8').replace('Include: data/eq/v5/','Include: data/eq/v5/headphone.txt'));assert.equal(read('headphone'),'data/eq/v5/headphone.txt');
+console.log('PASS: folder includes do not crash; existing BO7/MW4 EQ can be selected before tune; game matching preserved.');

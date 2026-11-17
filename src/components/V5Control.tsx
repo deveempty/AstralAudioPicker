@@ -33,7 +33,7 @@ export default function V5Control({ disabled = false }: Props) {
 
   useEffect(() => {
     let live = true
-    const refresh = () => { void Promise.all([window.electronAPI.getV5Readiness(), window.electronAPI.getV5Presets(), window.electronAPI.getV5ActiveState()]).then(([nextReadiness, nextPresets, nextActive]) => {
+    const refresh = () => { void Promise.all([window.electronAPI.getV5Readiness(), window.electronAPI.getV5Presets(), window.electronAPI.getV5ActiveState().catch(() => EMPTY_ACTIVE)]).then(([nextReadiness, nextPresets, nextActive]) => {
       if (!live) return
       setReadiness(nextReadiness); setPresets(nextPresets); setActive(nextActive)
       const current = nextPresets.find(item => item.filename === nextActive.tuneFilename)
@@ -54,8 +54,8 @@ export default function V5Control({ disabled = false }: Props) {
     if (!selected) return
     setBusy(true); setMessage(''); setNeedsEq(false); setGeneration(generate?0:null)
     try {
-      const result = await withTimeout(window.electronAPI.setV5Preset(selected.filename,generate), generate ? 180000 : 30000)
-      if (result.success) { await refreshActive(); setMessage(t(result.restarted ? 'profiles.appliedRestarted' : 'profiles.appliedRestartPending')) }
+      const result = await withTimeout(window.electronAPI.setV5Preset(selected.filename,generate), 180000)
+      if (result.success) { window.dispatchEvent(new CustomEvent('astral-config-changed')); await refreshActive(); setMessage(t(result.restarted ? 'profiles.appliedRestarted' : 'profiles.appliedRestartPending')) }
       else { setNeedsEq(result.code === 'V5_GAME_EQ_REQUIRED'); setMessage(result.code === 'V5_GAME_EQ_REQUIRED' ? t('profiles.gameEqRequired') : t('profiles.applyFailed', { code: result.code ?? t('common.unknown') })) }
     } catch {
       setMessage(t('profiles.applyFailed', { code: t('common.unknown') }))
