@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),esbuild=require('esbuild');
+const output=path.resolve('output/loudness16-test.cjs');fs.mkdirSync(path.dirname(output),{recursive:true});esbuild.buildSync({entryPoints:['electron/loudness16.ts'],bundle:true,platform:'node',format:'cjs',outfile:output});
+const {createLoudness16,readLoudness16}=require(output);
+(async()=>{
+ let state={deviceId:'{00000000-0000-0000-0000-000000000016}',enabled:false,releaseTime:40},writes=[];
+ const api=createLoudness16(async(id,value)=>{writes.push({id,enabled:value});state.enabled=value;return true},async(id,value)=>{writes.push({id,releaseTime:value});state.releaseTime=value;return true},async()=>({...state}));
+ assert.equal((await api.change({enabled:true})).enabled,true);assert.equal((await api.change({releaseTime:100})).releaseTime,100);assert(writes.every(x=>x.id===state.deviceId));
+ for(const bad of [{releaseTime:12},{releaseTime:NaN},{enabled:1},{enabled:true,releaseTime:20},{arbitrary:true}])await assert.rejects(api.change(bad));assert.equal(writes.length,2);
+ const failed=createLoudness16(async()=>false,async()=>false,async()=>({...state}));await assert.rejects(failed.change({enabled:false}),/WRITE_OR_RESTART/);
+ const stale=createLoudness16(async()=>true,async()=>true,async()=>({...state}));await assert.rejects(stale.change({enabled:false}),/READBACK/);
+ let unblock;const locked=createLoudness16(()=>new Promise(resolve=>{unblock=resolve}),async()=>true,async()=>({...state}));const first=locked.change({enabled:true});await new Promise(resolve=>setImmediate(resolve));await assert.rejects(locked.change({enabled:true}),/BUSY/);unblock(true);await first;
+ const writeOutput=path.resolve('output/loudness-write-test.cjs');esbuild.buildSync({entryPoints:['electron/loudness-write.ts'],bundle:true,platform:'node',format:'cjs',outfile:writeOutput});
+ const {loudnessWriteScript}=require(writeOutput);
+ const script=loudnessWriteScript(state.deviceId,'releaseTime',100,'C:\temp dir\result.json');
+ assert(script.includes('RegistryRights]::SetValue'));assert(script.includes('RegistryKeyPermissionCheck]::ReadWriteSubTree'));assert(script.includes('3,0,0,0,1,0,0,0,7,0,0,0'));assert(!script.includes('New-ItemProperty'));assert(script.includes('{9c00eeed-edce-4cd8-ae08-cb05e8ef57a0},0'));assert(script.includes('1599'));assert(!script.includes('Restart-Service'));assert(script.includes('/restart-device $instanceId'));assert(script.includes('SWD\\MMDEVAPI\\{0.0.0.00000000}.'+state.deviceId));assert(loudnessWriteScript(state.deviceId,'enabled',true,'result').includes('{fc52a749-4be9-4510-896e-966ba6525980},0'));
+ assert.throws(()=>loudnessWriteScript('bad','enabled',true,'result'));assert.throws(()=>loudnessWriteScript(state.deviceId,'releaseTime',12,'result'));
+ const denied=createLoudness16(async()=>{throw Error('LOUDNESS_WRITE_FAILED')},async()=>true,async()=>({...state}));await assert.rejects(denied.change({enabled:true}),/LOUDNESS_WRITE_FAILED/);
+ console.log('PASS: isolated 16ch target, six release positions, input validation, serialization, restart failure and readback mismatch. Writes mocked.');
+ if(process.argv.includes('--read-live'))console.log('Read-only live state:',await readLoudness16());
+})().catch(e=>{console.error(e);process.exitCode=1});

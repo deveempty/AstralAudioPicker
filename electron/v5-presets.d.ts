@@ -1,4 +1,7 @@
+import { type V5Game, type V5Hrir } from '../shared/v5-catalog';
 export interface V5Preset {
+    game: V5Game;
+    hrir: V5Hrir;
     id: string;
     name: string;
     profile: string;
@@ -49,12 +52,12 @@ interface ParametricFilter {
 export declare function optimizeParametricEq(frequencies: number[], target: number[], filterCount?: number): ParametricFilter[];
 export interface AutoEqGenerationProgress {
     completed: number;
-    total: 3;
+    total: number;
     profile: 'AT V1' | 'AIW V3' | 'AIW V5';
     phase: 'generating' | 'completed';
     percent: number;
 }
-export declare function generateHeadphoneEqSet(measurementFile: string, onProgress?: (progress: AutoEqGenerationProgress) => void): Promise<GeneratedHeadphoneEqSet | null>;
+export declare function generateHeadphoneEqSet(measurementFile: string, onProgress?: (progress: AutoEqGenerationProgress) => void, v5Game?: V5Game, preserveExisting?: boolean): Promise<GeneratedHeadphoneEqSet | null>;
 export declare function getV5Readiness(): {
     presetLibrary: boolean;
     measurementsLibrary: boolean;
@@ -63,4 +66,5 @@ export declare function getV5Readiness(): {
         [k: string]: boolean;
     };
 };
+export declare function generateBothGameEqs(measurement: string, game: V5Game, onProgress?: (progress: AutoEqGenerationProgress) => void, preserveExisting?: boolean): Promise<GeneratedHeadphoneEqSet | null>;
 export {};

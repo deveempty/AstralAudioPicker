@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import { Box, Button, Flex, Input, Progress, Text } from '@chakra-ui/react'
 import { FiHeadphones, FiSearch, FiX } from 'react-icons/fi'
@@ -59,7 +60,7 @@ export default function HeadphoneEqModal({ open, disabled, onClose, onApplied }:
     if (!selected) return
     setBusy(true)
     setError('')
-    setProgress({ completed: 0, total: 3, profile: 'AT V1', phase: 'generating', percent: 0 })
+    setProgress({ completed: 0, total: 6, profile: 'AT V1', phase: 'generating', percent: 0 })
     const result = await window.electronAPI.setV5HeadphoneEq(selected.relativePath)
     if (result.success) {
       await onApplied()
@@ -112,9 +113,8 @@ export default function HeadphoneEqModal({ open, disabled, onClose, onApplied }:
           </Box>
           {selected ? <Flex mt="3" gap="2" align="center" wrap="wrap" px="3" py="2.5" borderRadius="11px" bg="rgba(139,92,246,.07)" border="1px solid rgba(139,92,246,.16)"><Text mr="auto" color="whiteAlpha.700" fontSize="xs" fontWeight="700">{t('autoeq.configuration')}</Text><StatusTag tone="purple">AT V1 · AIW V3 · AIW V5</StatusTag><StatusTag tone="blue">{t('eq.average')}</StatusTag><StatusTag tone="green">20–7500 Hz</StatusTag></Flex> : null}
           {busy && progress ? <Box mt="3" px="3" py="3" borderRadius="11px" bg="rgba(139,92,246,.075)" border="1px solid rgba(139,92,246,.2)">
-            <Flex mb="2" align="center" justify="space-between"><Text color="whiteAlpha.800" fontSize="xs" fontWeight="700">{t(progress.phase === 'generating' ? 'autoeq.generatingProfile' : 'autoeq.profileComplete', { profile: progress.profile })}</Text><Text color="purple.200" fontSize="xs" fontWeight="800">{progress.completed}/3</Text></Flex>
+            <Flex mb="2" align="center" justify="space-between"><Text color="whiteAlpha.800" fontSize="xs" fontWeight="700">{t(progress.phase === 'generating' ? 'autoeq.generatingProfile' : 'autoeq.profileComplete', { profile: progress.profile })}</Text><Text color="purple.200" fontSize="xs" fontWeight="800">{progress.completed}/{progress.total}</Text></Flex>
             <Progress.Root value={progress.percent} colorPalette="purple" size="sm"><Progress.Track borderRadius="full" bg="whiteAlpha.100"><Progress.Range borderRadius="full" /></Progress.Track></Progress.Root>
-            <Flex mt="2" justify="space-between">{(['AT V1', 'AIW V3', 'AIW V5'] as const).map((label, index) => <Text key={label} color={progress.completed > index ? 'green.300' : 'whiteAlpha.350'} fontSize="9px" fontWeight="700">{progress.completed > index ? '✓ ' : ''}{label}</Text>)}</Flex>
           </Box> : null}
           {error ? <Text mt="3" color="red.300" fontSize="xs">{error}</Text> : null}
           <Flex mt="4" gap="3" justify="flex-end"><AstralButton variant="ghost" onClick={onClose}>{t('common.cancel')}</AstralButton><AstralButton disabled={!selected || busy || disabled} onClick={apply}>{t(busy ? 'autoeq.generating' : 'autoeq.generateApply')}</AstralButton></Flex>

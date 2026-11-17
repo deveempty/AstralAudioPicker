@@ -13,6 +13,7 @@ export const LEGACY_DEVICE_GUID = '{9d2cc7d4-0bec-4041-a20e-f4e453232e78}'
 export const V5_DEVICE_GUID = '{ec3aafdf-166d-46cd-9ea6-fa9cdd52b1c0}'
 
 const V5_LIBRARY_CANDIDATES = [
+  path.join(EQUALIZER_APO_CONFIG, 'data', 'AIWV5', 'ArtTuneKit', 'BO7', 'V5'),
   path.join(EQUALIZER_APO_CONFIG, 'BO7', 'V5'),
   path.join(EQUALIZER_APO_CONFIG, 'data', 'BO7', 'V5'),
   path.join(EQUALIZER_APO_CONFIG, 'ArtTuneDB', 'library', 'BO7', 'V5'),
@@ -38,8 +39,8 @@ export function firstExistingDirectory(candidates: string[]): string | null {
   return candidates.find(candidate => fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) ?? null
 }
 
-export function findV5Library(): string | null {
-  return firstExistingDirectory(V5_LIBRARY_CANDIDATES)
+export function findV5Library(game: 'BO7'|'MW4' = 'BO7'): string | null {
+  return firstExistingDirectory(game==='BO7'?V5_LIBRARY_CANDIDATES:[path.join(EQUALIZER_APO_CONFIG,'data','AIWV5','ArtTuneKit','MW4','V1')])
 }
 
 export function findMeasurementsLibrary(): string | null {
@@ -61,6 +62,7 @@ export function findTargetsLibrary(): string | null {
 }
 
 export const PLUGIN_PATHS = {
+  vstCharlie: 'C:\\Program Files\\VSTPlugins\\ArtTuneKit\\atk_spatial_engine_charlie_v1_1_0.dll',
   vstV1: 'C:\\Program Files\\VSTPlugins\\ArtTuneKit\\atk_spatial_engine_bravo_v1.0.2.dll',
   vstV2: 'C:\\Program Files\\VSTPlugins\\ArtTuneKit\\atk_spatial_engine_bravo_v2_0_0.dll',
   jsfxEngine: 'C:\\Program Files\\VSTPlugins\\ReaPlugs\\JS\\Effects\\ArtTune\\atk_spatial_engine.jsfx',

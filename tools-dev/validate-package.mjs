@@ -26,6 +26,8 @@ if (JSON.stringify(packagedRoots) !== JSON.stringify(['dist', 'dist-electron']))
 for (const resource of builder.extraResources || []) {
   const normalized = String(resource.from || '').replaceAll('\\', '/').toLowerCase()
   if (normalized === 'src/assets/appicon.ico' && ['branding/appicon.ico', 'branding/shortcut-${version}.ico'].includes(resource.to)) continue
+  if (normalized === 'src/assets/endpoint-icons' && resource.to === 'branding/endpoint-icons' && JSON.stringify(resource.filter) === JSON.stringify(['*.ico'])) continue
+  if (normalized === 'resources/audio-update' && resource.to === 'audio-update' && JSON.stringify(resource.filter) === JSON.stringify(['manifest.json'])) continue
   if (!['electron/scripts', 'electron/tools'].includes(normalized)) errors.push(`Unexpected extraResources source: ${resource.from}`)
 }
 
@@ -44,9 +46,12 @@ const unpackedResources = path.join(releaseRoot, 'win-unpacked', 'resources')
 if (fs.existsSync(unpackedResources)) {
   for (const file of walk(unpackedResources)) {
     const relative = path.relative(unpackedResources, file).replaceAll('\\', '/')
+    if (relative.startsWith('audio-update/') && relative !== 'audio-update/manifest.json') errors.push(`win-unpacked/resources/${relative}: downloadable audio payload must not be bundled`)
     const segments = relative.toLowerCase().split('/')
     if (segments.some(segment => forbiddenSegments.has(segment))) errors.push(`win-unpacked/resources/${relative}: forbidden development directory`)
-    if (forbiddenExtensions.has(path.extname(file).toLowerCase())) errors.push(`win-unpacked/resources/${relative}: forbidden development file type`)
+    // Koffi ships upstream documentation and license notices with its native runtime.
+    const vendorMarkdown = relative.startsWith('app.asar.unpacked/node_modules/koffi/') && path.extname(file).toLowerCase() === '.md'
+    if (forbiddenExtensions.has(path.extname(file).toLowerCase()) && !vendorMarkdown) errors.push(`win-unpacked/resources/${relative}: forbidden development file type`)
   }
 } else if (requireArtifacts) {
   warnings.push('win-unpacked resources are unavailable; validating NSIS artifacts and builder allowlist only')

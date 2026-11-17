@@ -1,3 +1,4 @@
+import Loudness16Control from './Loudness16Control'
 import {cosmicAudioStatus} from './cosmic-audio-status'
 import { useEffect, useRef, useState } from 'react'
 import { Box, Flex, Input, Slider, Switch, Text, VStack } from '@chakra-ui/react'
@@ -131,6 +132,7 @@ export default function PluginControl() {
           {!isToggle ? <Slider.Root title={t('cosmic.resetSlider')} onDoubleClick={() => { change(parameter.id, Math.fround(parameter.initial)); clearTimeout(timer.current); void flush() }} disabled={actionRunning.current} mt="3" min={0} max={1} step={.001} value={[value]} onValueChange={e => change(parameter.id, e.value[0])} onValueChangeEnd={() => { clearTimeout(timer.current); void flush() }}><Slider.Control><Slider.Track h="1.5" bg="whiteAlpha.200" borderRadius="full"><Slider.Range bg="purple.500" /></Slider.Track><Slider.Thumb index={0} boxSize="4" bg="purple.300" borderColor="purple.500" aria-label={label} aria-valuetext={formatted} aria-describedby={`cosmic-help-${parameter.id}`}><Slider.HiddenInput /></Slider.Thumb></Slider.Control></Slider.Root> : null}
         </Box>
       })}
+      {page===-1||page===0?<Loudness16Control disabled={dirty}/>:null}
     </VStack>
 
   </VStack>

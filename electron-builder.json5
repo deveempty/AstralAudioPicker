@@ -9,7 +9,18 @@
     "dist",
     "dist-electron"
   ],
+  "asarUnpack": ["node_modules/koffi/**", "node_modules/@koromix/**"],
   "extraResources": [
+    {
+      "from": "resources/audio-update",
+      "to": "audio-update",
+      "filter": ["manifest.json"]
+    },
+    {
+      "from": "src/assets/endpoint-icons",
+      "to": "branding/endpoint-icons",
+      "filter": ["*.ico"]
+    },
     {
       "from": "src/assets/appicon.ico",
       "to": "branding/appicon.ico"

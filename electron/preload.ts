@@ -4,6 +4,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 // Here we just expose the IPC bridge without explicit typing to avoid conflicts
 
 const electronAPI = {
+  audioUpgradeStatus:()=>ipcRenderer.invoke('audio-upgrade-status'),
+  audioUpgradeRetry:()=>ipcRenderer.invoke('audio-upgrade-retry'),
+  audioUpgradeInstall:()=>ipcRenderer.invoke('audio-upgrade-install'),
   communityList: (query: import('../shared/community').CommunityQuery) => ipcRenderer.invoke('community-list',query),
   communityPublish: (publication: import('../shared/community').CommunityPublication) => ipcRenderer.invoke('community-publish',publication),
   communityApply: (id:string) => ipcRenderer.invoke('community-apply',id),
@@ -32,12 +35,23 @@ const electronAPI = {
   setV2Sub: (subKey: string) => ipcRenderer.invoke('set-v2-sub', subKey),
   checkConfigExists: () => ipcRenderer.invoke('check-config-exists'),
   getAudioDevices: () => ipcRenderer.invoke('get-audio-devices'),
+  getLoudness16:()=>ipcRenderer.invoke('get-loudness16'),
+  onLoudness16Changed:(callback:()=>void)=>{
+    const listener=()=>callback()
+    ipcRenderer.on('loudness16-changed',listener)
+    return ()=>ipcRenderer.removeListener('loudness16-changed',listener)
+  },
+  setLoudness16:(change:import('../shared/loudness16').Loudness16Change)=>ipcRenderer.invoke('set-loudness16',change),
   getLoudnessSettings: (deviceId: string) => ipcRenderer.invoke('get-loudness-settings', deviceId),
   setLoudnessEnabled: (deviceId: string, enabled: boolean) => ipcRenderer.invoke('set-loudness-enabled', deviceId, enabled),
   setLoudnessReleaseTime: (deviceId: string, value: number) => ipcRenderer.invoke('set-loudness-release-time', deviceId, value),
   restartAudioDevice: (deviceId: string) => ipcRenderer.invoke('restart-audio-device', deviceId),
   restartWindowsAudio: () => ipcRenderer.invoke('restart-windows-audio'),
   openEapoDeviceSelector: () => ipcRenderer.invoke('open-eapo-device-selector'),
+  audioStartupStatus:()=>ipcRenderer.invoke('audio-startup-status'),
+  audioStartupSet:(enabled:boolean)=>ipcRenderer.invoke('audio-startup-set',enabled),
+  voicemeeterStatus:()=>ipcRenderer.invoke('voicemeeter-status'),
+  voicemeeterCommand:(command:import('../shared/voicemeeter').VmCommand)=>ipcRenderer.invoke('voicemeeter-command',command),
   disableVoicemeeterEndpoints: () => ipcRenderer.invoke('disable-voicemeeter-endpoints'),
   getChannelConfig: () => ipcRenderer.invoke('get-channel-config'),
   setChannelConfig: (channelConfig: 'stereo' | '7.1') => ipcRenderer.invoke('set-channel-config', channelConfig),
@@ -54,7 +68,7 @@ const electronAPI = {
   getHeadphoneEqs: () => ipcRenderer.invoke('get-headphone-eqs'),
   searchHeadphoneEqs: (query: string, limit = 80, type = 'all') => ipcRenderer.invoke('search-headphone-eqs', query, limit, type),
   getV5ActiveState: () => ipcRenderer.invoke('get-v5-active-state'),
-  setV5Preset: (filename: string) => ipcRenderer.invoke('set-v5-preset', filename),
+  setV5Preset: (filename: string, generate = false) => ipcRenderer.invoke('set-v5-preset', filename, generate),
   setV5HeadphoneEq: (relativePath: string) => ipcRenderer.invoke('set-v5-headphone-eq', relativePath),
   onAutoEqProgress: (callback: (progress: unknown) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: unknown) => callback(progress)

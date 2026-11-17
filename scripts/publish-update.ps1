@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([switch]$ResumeCurrentVersion)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -16,20 +16,17 @@ function Invoke-NativeCommand {
     )
 
     Write-Host "`n==> $Description" -ForegroundColor Cyan
-    & $Command
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Description failed with exit code $LASTEXITCODE."
+    # Windows PowerShell treats native stderr warnings as terminating errors
+    # under Stop. Native success/failure must be determined by the exit code.
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $Command
+        $nativeExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
     }
-}
-
-function Remove-PreviousR2Artifact {
-    param([Parameter(Mandatory)] [string] $ObjectPath)
-
-    Write-Host "`n==> Removing previous R2 artifact: $ObjectPath" -ForegroundColor Cyan
-    & npx.cmd wrangler r2 object delete $ObjectPath --remote --force
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Warning: the new release is published, but the previous artifact could not be removed: $ObjectPath" -ForegroundColor Yellow
-    }
+    if ($nativeExitCode -ne 0) { throw "$Description failed with exit code $nativeExitCode." }
 }
 
 function Get-NextVersion {
@@ -70,15 +67,17 @@ try {
         throw 'Could not read the current package version.'
     }
 
-    $releaseType = Get-NextVersion -CurrentVersion $currentVersion
+    $releaseType = if ($ResumeCurrentVersion) { $currentVersion } else { Get-NextVersion -CurrentVersion $currentVersion }
     $confirmation = (Read-Host "Build and publish '$releaseType' to the STABLE channel? Type YES").Trim()
     if ($confirmation -cne 'YES') {
         Write-Host 'Release cancelled. No files were changed.' -ForegroundColor Yellow
         exit 0
     }
 
-    Invoke-NativeCommand 'Updating package version' {
-        & npm.cmd version $releaseType --no-git-tag-version
+    if (-not $ResumeCurrentVersion) {
+        Invoke-NativeCommand 'Updating package version' {
+            & npm.cmd version $releaseType --no-git-tag-version
+        }
     }
 
     $newVersion = (& node -p "require('./package.json').version").Trim()
@@ -120,6 +119,21 @@ try {
 
     Push-Location $workerRoot
     try {
+        # Publish immutable dependencies before announcing the Picker update.
+        # Keep these objects: clients on earlier releases still pin their hashes.
+        $audioRoot = Join-Path $projectRoot 'resources\audio-update'
+        $audioManifest = Get-Content -LiteralPath (Join-Path $audioRoot 'manifest.json') -Raw | ConvertFrom-Json
+        $audioObjects = @(
+            @{ Name = 'mw4-content-v1.zip'; Hash = $audioManifest.archiveSha256; Size = $audioManifest.archiveBytes; Type = 'application/zip' },
+            @{ Name = 'voicemeetersetup.exe'; Hash = $audioManifest.installerSha256; Size = $audioManifest.installerBytes; Type = 'application/vnd.microsoft.portable-executable' }
+        )
+        foreach ($asset in $audioObjects) {
+            $assetPath = Join-Path $audioRoot $asset.Name
+            if ((Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $asset.Hash -or (Get-Item -LiteralPath $assetPath).Length -ne $asset.Size) { throw "Audio asset changed since validation: $($asset.Name)" }
+            Invoke-NativeCommand "Uploading audio dependency $($asset.Name)" {
+                & npx.cmd wrangler r2 object put "$bucketPrefix/content/$($asset.Hash)/$($asset.Name)" --file $assetPath --content-type $asset.Type --cache-control 'public, max-age=31536000, immutable' --remote --force
+            }
+        }
         Invoke-NativeCommand "Uploading $setupName" {
             & npx.cmd wrangler r2 object put "$bucketPrefix/$setupName" --file $setupPath --content-type 'application/vnd.microsoft.portable-executable' --cache-control 'public, max-age=31536000, immutable' --remote --force
         }
@@ -130,9 +144,11 @@ try {
             & npx.cmd wrangler r2 object put "$bucketPrefix/latest.yml" --file $latestPath --content-type 'text/yaml' --cache-control 'no-cache, no-store, must-revalidate' --remote --force
         }
 
-        $previousSetupName = "Astral-Audio-Picker-Setup-$currentVersion.exe"
-        Remove-PreviousR2Artifact -ObjectPath "$bucketPrefix/$previousSetupName"
-        Remove-PreviousR2Artifact -ObjectPath "$bucketPrefix/$previousSetupName.blockmap"
+        # Retain current + two previous releases only after verifying the remote feed.
+        & node (Join-Path $PSScriptRoot 'prune-picker-releases.mjs') --apply
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning 'Release published, but retention cleanup did not finish. Review it before the next release.'
+        }
     }
     finally {
         Pop-Location
@@ -140,7 +156,7 @@ try {
 
     Write-Host "`nVersion $newVersion was published successfully." -ForegroundColor Green
     Write-Host "Channel: picker/stable"
-    Write-Host "Previous R2 artifacts for version $currentVersion were removed."
+    Write-Host "Retention policy: current version plus two previous versions; audio content is preserved."
 }
 catch {
     Write-Host "`nRelease stopped: $($_.Exception.Message)" -ForegroundColor Red

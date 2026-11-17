@@ -4,6 +4,7 @@ export interface DiagnosticCheck {
     status: DiagnosticStatus;
     detail: string;
     paths?: string[];
+    values?: Record<string, string | number>;
 }
 export interface DiagnosticReport {
     checkedAt: number;

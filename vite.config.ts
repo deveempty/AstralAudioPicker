@@ -18,7 +18,7 @@ export default defineConfig(({ command, mode }) => ({
     electron({
       main: {
         entry: 'electron/main.ts',
-        vite: { define: { __AUDIO_LOCAL_TEST__: JSON.stringify(mode !== 'auth-test' && (command === 'serve' || process.env.ASTRAL_AUDIO_LOCAL_TEST === '1')) } },
+        vite: { build:{rollupOptions:{external:['koffi']}}, define: { __AUDIO_LOCAL_TEST__: JSON.stringify(mode !== 'auth-test' && (command === 'serve' || process.env.ASTRAL_AUDIO_LOCAL_TEST === '1')) } },
       },
       preload: {
         input: path.join(__dirname, 'electron/preload.ts'),

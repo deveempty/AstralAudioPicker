@@ -30,7 +30,10 @@ declare global {
   const __APP_VERSION__: string
 
   interface Window {
-    electronAPI: import('../shared/community').CommunityAPI & {
+    electronAPI: import('../shared/community').CommunityAPI & import('../shared/voicemeeter').VoicemeeterAPI & {
+      audioUpgradeStatus:()=>Promise<import('../shared/audio-upgrade').AudioUpgradeStatus>
+      audioUpgradeRetry:()=>Promise<import('../shared/audio-upgrade').AudioUpgradeStatus>
+      audioUpgradeInstall:()=>Promise<import('../shared/audio-upgrade').AudioUpgradeStatus>
       importPluginPreset: () => Promise<import('../shared/plugin-control').PluginTransferResult>
       exportPluginPreset: (id:string) => Promise<import('../shared/plugin-control').PluginTransferResult>
       runAudioDiagnostics: () => Promise<import('../shared/diagnostics').DiagnosticReport>
@@ -52,6 +55,9 @@ declare global {
       setV2Sub: (subKey: string) => Promise<ConfigResult>
       checkConfigExists: () => Promise<boolean>
       getAudioDevices: () => Promise<AudioDevice[]>
+      getLoudness16:()=>Promise<import('../shared/loudness16').Loudness16State>
+      onLoudness16Changed:(callback:()=>void)=>()=>void
+      setLoudness16:(change:import('../shared/loudness16').Loudness16Change)=>Promise<import('../shared/loudness16').Loudness16State>
       getLoudnessSettings: (deviceId: string) => Promise<LoudnessSettings>
       setLoudnessEnabled: (deviceId: string, enabled: boolean) => Promise<boolean>
       setLoudnessReleaseTime: (deviceId: string, value: number) => Promise<boolean>
@@ -74,7 +80,7 @@ declare global {
       getHeadphoneEqs: () => Promise<HeadphoneEq[]>
       searchHeadphoneEqs: (query: string, limit?: number, type?: 'all' | 'IEM' | 'Headphone') => Promise<HeadphoneSearchResult>
       getV5ActiveState: () => Promise<V5ActiveState>
-      setV5Preset: (filename: string) => Promise<ApplyResult>
+      setV5Preset: (filename: string, generate?: boolean) => Promise<ApplyResult>
       setV5HeadphoneEq: (relativePath: string) => Promise<ApplyResult>
       onAutoEqProgress: (callback: (progress: AutoEqGenerationProgress) => void) => () => void
       getPickerUpdateStatus: () => Promise<UpdateStatus>

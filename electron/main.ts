@@ -1,3 +1,15 @@
+import {matchingGameEq} from './v5-game-eq'
+import {parseV5Preset} from '../shared/v5-catalog'
+import {updateEndpointIcons} from './endpoint-icons'
+import {createAudioUpgrade,preferredRelayEdition} from './audio-upgrade'
+import {writeLoudness} from './loudness-write'
+import {createLoudness16} from './loudness16'
+import {ensureLoudness16Enabled} from './loudness-migration'
+import type {Loudness16Change} from '../shared/loudness16'
+import {audioStartupStatus,audioStartupSet} from './audio-startup'
+import {audioTrayLabels} from '../shared/audio-tray-labels'
+import {createVoicemeeter} from './voicemeeter'
+import type {VmCommand} from '../shared/voicemeeter'
 import {pickerUpdateBlocked} from './updater'
 import {createPluginTransfer} from './plugin-transfer'
 import {createCommunity} from './community'
@@ -7,11 +19,11 @@ import {audioLocalTest} from './local-test-mode'
 import {createAudioAccess} from './audio-access'
 import { CUSTOM_OUTPUT_DLL, customOutputActive, routeCustomOutput } from './custom-output'
 import { PluginControlStore, pluginControlDirectory } from './plugin-control'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Tray, Menu } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { exec, execFile } from 'node:child_process'
-import { generateHeadphoneEqSet, getV5Readiness, listHeadphoneEqs, listV5Presets, resolveHeadphoneEq, resolveV5Preset, searchHeadphoneEqs } from './v5-presets'
+import { generateBothGameEqs, getV5Readiness, listHeadphoneEqs, listV5Presets, resolveHeadphoneEq, resolveV5Preset, searchHeadphoneEqs } from './v5-presets'
 import { LEGACY_DEVICE_NAME, MAIN_CONFIG_FILE, V5_DEVICE_NAME } from './astral-paths'
 import { runPendingMigrations } from './migrations'
 import { attachUpdaterWindow, initializeAutoUpdater, publishMigrationStatus } from './updater'
@@ -23,6 +35,19 @@ function handlePicker(channel: string, listener: Parameters<typeof ipcMain.handl
   return listener(event,...args)
  })
 }
+const voicemeeter=createVoicemeeter(preferredRelayEdition)
+const audioUpgrade=createAudioUpgrade(voicemeeter,async()=>{
+ await ensureLoudness16Enabled(path.join(process.env.ProgramData||'C:\\ProgramData','AstralAudio','migrations'),()=>loudness16.read(),()=>loudness16.change({enabled:true}))
+ win?.webContents.send('loudness16-changed')
+})
+ipcMain.handle('audio-upgrade-status',()=>audioUpgrade.status())
+handlePicker('audio-upgrade-retry',()=>audioUpgrade.prepare())
+handlePicker('audio-upgrade-install',()=>audioUpgrade.install())
+handlePicker('voicemeeter-status',()=>voicemeeter.status())
+handlePicker('voicemeeter-command',(_event,command:VmCommand)=>voicemeeter.command(command))
+app.on('before-quit',()=>voicemeeter.dispose())
+handlePicker('audio-startup-status',()=>audioStartupStatus())
+handlePicker('audio-startup-set',(_event,enabled:unknown)=>audioStartupSet(enabled))
 const CONFIG_PATH = 'C:\\Program Files\\EqualizerAPO\\config'
 const CONFIG_FILE = path.join(CONFIG_PATH, 'config.txt')
 const AT_V2_FILE = path.join(CONFIG_PATH, 'at_v2.txt')
@@ -31,11 +56,17 @@ const AIW_V3_FILE = path.join(CONFIG_PATH, 'aiw_v3.txt')
 let audioAccess: ReturnType<typeof createAudioAccess>
 let win: BrowserWindow | null = null
 
+let tray:Tray|null=null
+function showAudioWindow(){if(!win||win.isDestroyed()){createWindow();if(win)attachUpdaterWindow(win)}win?.show();win?.restore();win?.focus()}
+const primaryInstance=app.requestSingleInstanceLock()
+if(!primaryInstance)app.quit()
+app.on('second-instance',(_event,args)=>{if(!args.includes('--audio-background'))showAudioWindow()})
 function createWindow() {
   win = new BrowserWindow({
     icon: app.isPackaged
       ? path.join(process.resourcesPath, 'branding', 'appicon.ico')
       : path.join(app.getAppPath(), 'src', 'assets', 'appicon.ico'),
+    show: !process.argv.includes('--audio-background'),
     width: 1550,
     height: 1000,
     frame: false,
@@ -58,8 +89,18 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if(!primaryInstance)return
+  void updateEndpointIcons().catch(error=>console.warn('Endpoint icon update deferred:',error instanceof Error?error.message:String(error)))
+  const icon=app.isPackaged?path.join(process.resourcesPath,'branding','appicon.ico'):path.join(app.getAppPath(),'src','assets','appicon.ico')
+  try{
+    tray=new Tray(icon);tray.setToolTip('Astral Audio');tray.on('click',showAudioWindow)
+    const labels=app.getLocale().startsWith('es')?audioTrayLabels.es:audioTrayLabels.en
+    tray.setContextMenu(Menu.buildFromTemplate([{label:labels.open,click:showAudioWindow},{type:'separator'},{label:labels.quit,click:()=>app.quit()}]))
+  }catch{tray=null}
+  if(process.argv.includes('--audio-background'))void voicemeeter.command({action:'connect'}).catch(()=>showAudioWindow())
   audioAccess=createAudioAccess(CONFIG_FILE)
   createWindow()
+  if(!tray)win?.show()
   if (win) attachUpdaterWindow(win)
   win?.webContents.once('did-finish-load', async () => {
     if (audioLocalTest) { publishMigrationStatus({ phase: 'idle' }); return }
@@ -71,13 +112,16 @@ app.whenReady().then(async () => {
     }
     publishMigrationStatus({ phase: 'idle' })
     if (win) initializeAutoUpdater(win)
+    void audioUpgrade.prepare()
   })
 })
 app.on('window-all-closed', () => app.quit())
 
 // Window controls
 ipcMain.on('minimize', () => win?.minimize())
-ipcMain.on('close', () => win?.close())
+// Closing Astral ends its UI and tray process. Remote API logout does not
+// stop Voicemeeter, so the selected audio route continues independently.
+ipcMain.on('close', () => app.quit())
 
 // Config reading
 interface ConfigState {
@@ -423,6 +467,13 @@ function setLoudnessReleaseTime(deviceId: string, value: number): Promise<boolea
   const script = `$ErrorActionPreference = 'Stop'\n$fxPath = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render\\${endpointGuid}\\FxProperties'\n$bytes = [byte[]]@(0x03,0x00,0x00,0x00,0x01,0x00,0x00,0x00,${releaseTime},0x00,0x00,0x00)\nforeach ($suffix in @(3,1599)) { New-ItemProperty -LiteralPath $fxPath -Name ('{9c00eeed-edce-4cd8-ae08-cb05e8ef57a0},' + $suffix) -PropertyType Binary -Value $bytes -Force | Out-Null }\nRestart-Service audiosrv -Force\n`
   return runElevatedAudioTask('AstralSetLoudnessRelease.ps1', script)
 }
+
+const loudness16=createLoudness16(
+ (id,value)=>voicemeeter.withEndpointRestart(()=>writeLoudness(id,'enabled',value)),
+ (id,value)=>voicemeeter.withEndpointRestart(()=>writeLoudness(id,'releaseTime',value)),
+)
+handlePicker('get-loudness16',()=>loudness16.read())
+handlePicker('set-loudness16',(_event,change:Loudness16Change)=>loudness16.change(change))
 
 handlePicker('get-loudness-settings', (_event, deviceId: string) => getLoudnessSettings(deviceId))
 handlePicker('set-loudness-enabled', (_event, deviceId: string, enabled: boolean) => setLoudnessEnabled(deviceId, enabled))
@@ -943,15 +994,22 @@ handlePicker('get-v5-active-state', () => {
 type V5IncludeSlot = 'tune' | 'headphone'
 
 function updateV5Include(slot: V5IncludeSlot, absoluteFile: string): boolean {
+  return updateV5Includes({ [slot]: absoluteFile })
+}
+
+function updateV5Includes(files: Partial<Record<V5IncludeSlot, string>>): boolean {
   if (!fs.existsSync(MAIN_CONFIG_FILE)) return false
+  const lines = fs.readFileSync(MAIN_CONFIG_FILE, 'utf8').split(/\r?\n/)
+  const enabled=readConfigState().mainConfig==='aiwv5'
+  for (const [slot, absoluteFile] of Object.entries(files)) {
+  if (!fs.existsSync(absoluteFile)) return false
   const relativeFile = path.relative(path.dirname(MAIN_CONFIG_FILE), absoluteFile).replaceAll('/', '\\')
   if (relativeFile.startsWith('..')) return false
 
-  const lines = fs.readFileSync(MAIN_CONFIG_FILE, 'utf8').split(/\r?\n/)
-  const includeIndex=v5SlotIndex(lines,slot)
+  const includeIndex=v5SlotIndex(lines,slot as V5IncludeSlot)
   if(includeIndex<0)return false
-  const enabled=readConfigState().mainConfig==='aiwv5'
   lines[includeIndex]=(enabled?'':'# ')+`Include: ${relativeFile}`
+  }
   const temporaryFile = `${MAIN_CONFIG_FILE}.astral.tmp`
   fs.writeFileSync(temporaryFile, lines.join('\r\n'), 'utf8')
   fs.renameSync(temporaryFile, MAIN_CONFIG_FILE)
@@ -966,19 +1024,35 @@ function restartV5Cable(): Promise<boolean> {
   }))
 }
 
-handlePicker('set-v5-preset', async (_event, filename: string) => {
+handlePicker('set-v5-preset', async (event, filename: string, generate = false) => {
   const preset = resolveV5Preset(filename)
   if (!preset) return { success: false, code: 'V5_PRESET_NOT_FOUND' }
-  const success = updateV5Include('tune', preset)
+  if(filename.startsWith('MW4_')&&!getV5Readiness().plugins.vstCharlie)return {success:false,code:'CHARLIE_NOT_INSTALLED'}
+  const game = parseV5Preset(filename)!.game
+  const currentEq = readV5Include('headphone')
+  let eq = currentEq && matchingGameEq(path.resolve(path.dirname(MAIN_CONFIG_FILE), currentEq), game)
+  if (!eq && generate === true && currentEq) {
+    const currentFile=path.resolve(path.dirname(MAIN_CONFIG_FILE),currentEq)
+    const source=fs.existsSync(currentFile)?fs.readFileSync(currentFile,'utf8').match(/^# Source file:\s*(.+)$/mi)?.[1].trim():null
+    const measurement=source && resolveHeadphoneEq(source)
+    if(!measurement)return {success:false,code:'HEADPHONE_EQ_NOT_FOUND'}
+    const generated=await generateBothGameEqs(measurement,game,p=>{if(!event.sender.isDestroyed())event.sender.send('auto-eq-progress',p)},true)
+    if(!generated)return {success:false,code:'AUTO_EQ_GENERATION_FAILED'}
+    eq=matchingGameEq(generated.aiwV5.outputFile,game)
+  }
+  if (!eq) return { success: false, code: 'V5_GAME_EQ_REQUIRED' }
+  const success = updateV5Includes({ tune: preset, headphone: eq })
   if (!success) return { success: false, code: 'V5_CONFIG_NOT_READY' }
   const restarted = await restartV5Cable()
   return { success: true, restarted }
 })
 
 handlePicker('set-v5-headphone-eq', async (event, relativePath: string) => {
+  const v5Game=parseV5Preset(path.basename(readV5Include('tune') ?? ''))?.game ?? 'BO7'
+  if(v5Game!=='BO7'&&v5Game!=='MW4')return {success:false,code:'INVALID_TARGET'}
   const headphoneEq = resolveHeadphoneEq(relativePath)
   if (!headphoneEq) return { success: false, code: 'HEADPHONE_EQ_NOT_FOUND' }
-  const generatedEqs = await generateHeadphoneEqSet(headphoneEq, progress => {
+  const generatedEqs = await generateBothGameEqs(headphoneEq, v5Game, progress => {
     if (!event.sender.isDestroyed()) event.sender.send('auto-eq-progress', progress)
   })
   if (!generatedEqs) return { success: false, code: 'AUTO_EQ_GENERATION_FAILED' }
@@ -986,7 +1060,7 @@ handlePicker('set-v5-headphone-eq', async (event, relativePath: string) => {
   const aiwV3Name = path.basename(generatedEqs.aiwV3.outputFile, '.txt')
   const success = setCurrentFilter(atV1Name, 'v1')
     && setCurrentFilter(aiwV3Name, 'aiwv2')
-    && updateV5Include('headphone', generatedEqs.aiwV5.outputFile)
+    && (parseV5Preset(path.basename(readV5Include('tune') ?? ''))?.game !== v5Game || updateV5Include('headphone', generatedEqs.aiwV5.outputFile))
   if (!success) return { success: false, code: 'EQ_CONFIG_NOT_READY' }
   const restarts = await Promise.all([restartHiFiCable(), restartV5Cable()])
   const restarted = restarts.every(Boolean)
@@ -996,8 +1070,15 @@ handlePicker('set-v5-headphone-eq', async (event, relativePath: string) => {
 handlePicker('apply-saved-headphone-eq', async (_event, profile: 'atV1' | 'aiwV3' | 'aiwV5', filename: string) => {
   if (path.basename(filename) !== filename || !filename.toLocaleLowerCase().endsWith('.txt')) return { success: false, code: 'INVALID_EQ_FILE' }
   const folder = profile === 'atV1' ? EQ_V2_FOLDER : profile === 'aiwV3' ? EQ_V3_FOLDER : EQ_V5_FOLDER
-  const absoluteFile = path.join(folder, filename)
+  let absoluteFile = path.join(folder, filename)
   if (!fs.existsSync(absoluteFile)) return { success: false, code: 'EQ_NOT_FOUND' }
+  if (profile === 'aiwV5') {
+    const game = parseV5Preset(path.basename(readV5Include('tune') ?? ''))?.game
+    const matching = game && matchingGameEq(absoluteFile, game)
+    if (!matching) return { success: false, code: 'V5_GAME_EQ_REQUIRED' }
+    if(matching !== absoluteFile)return {success:false,code:'V5_GAME_MISMATCH'}
+    absoluteFile = matching
+  }
   const filterName = path.basename(filename, '.txt')
   const success = profile === 'atV1'
     ? setCurrentFilter(filterName, 'v1')
@@ -1009,17 +1090,18 @@ handlePicker('apply-saved-headphone-eq', async (_event, profile: 'atV1' | 'aiwV3
   return { success: true, restarted }
 })
 
-handlePicker('delete-saved-headphone-eq', (_event, files: Partial<Record<'atV1' | 'aiwV3' | 'aiwV5', string>>) => {
-  const folders = { atV1: EQ_V2_FOLDER, aiwV3: EQ_V3_FOLDER, aiwV5: EQ_V5_FOLDER } as const
+handlePicker('delete-saved-headphone-eq', (_event, files: Partial<Record<'atV1' | 'aiwV3' | 'aiwV5' | 'aiwMW4', string>>) => {
+  const folders = { atV1: EQ_V2_FOLDER, aiwV3: EQ_V3_FOLDER, aiwV5: EQ_V5_FOLDER, aiwMW4: EQ_V5_FOLDER } as const
   const validProfiles = new Set(Object.keys(folders))
   const rawEntries = Object.entries(files ?? {})
   if (!rawEntries.length || rawEntries.some(([profile, filename]) => !validProfiles.has(profile) || typeof filename !== 'string')) {
     return { success: false, code: 'INVALID_EQ_FILES' }
   }
-  const entries = rawEntries as Array<['atV1' | 'aiwV3' | 'aiwV5', string]>
+  const entries = rawEntries as Array<['atV1' | 'aiwV3' | 'aiwV5' | 'aiwMW4', string]>
 
   const filenames = new Set(entries.map(([, filename]) => filename.toLocaleLowerCase()))
-  if (filenames.size !== 1) return { success: false, code: 'INVALID_EQ_FILES' }
+  const baseNames = new Set(entries.map(([profile,filename])=>(profile==='aiwMW4'?filename.replace(/ - MW4 V[15]\.txt$/i,'.txt'):filename).toLowerCase()))
+  if (baseNames.size !== 1) return { success: false, code: 'INVALID_EQ_FILES' }
   if ([...filenames].some(filename => filename === 'flat.txt')) return { success: false, code: 'PROTECTED_EQ' }
 
   const activeFiles = {
@@ -1030,10 +1112,10 @@ handlePicker('delete-saved-headphone-eq', (_event, files: Partial<Record<'atV1' 
   const targets: string[] = []
   for (const [profile, filename] of entries) {
     if (path.basename(filename) !== filename || !filename.toLocaleLowerCase().endsWith('.txt')) return { success: false, code: 'INVALID_EQ_FILES' }
-    if (activeFiles[profile]?.toLocaleLowerCase() === filename.toLocaleLowerCase()) return { success: false, code: 'EQ_IN_USE' }
+    if (activeFiles[profile==='aiwMW4'?'aiwV5':profile]?.toLocaleLowerCase() === filename.toLocaleLowerCase()) return { success: false, code: 'EQ_IN_USE' }
     const target = path.join(folders[profile], filename)
     if (!fs.existsSync(target) || !fs.statSync(target).isFile()) return { success: false, code: 'EQ_NOT_FOUND' }
-    targets.push(target)
+    if(!targets.includes(target))targets.push(target)
   }
 
   const staged = targets.map((target, index) => `${target}.astral-delete-${process.pid}-${Date.now()}-${index}`)
@@ -1089,4 +1171,4 @@ handlePicker('audio-access-retry',()=>audioAccess.retry())
 handlePicker('audio-access-logout',()=>audioAccess.logout())
 
 let diagnosticsRun: ReturnType<typeof runDiagnostics> | undefined
-handlePicker('run-audio-diagnostics',()=>diagnosticsRun??=(runDiagnostics().finally(()=>{diagnosticsRun=undefined})))
+handlePicker('run-audio-diagnostics',()=>diagnosticsRun??=(runDiagnostics(()=>voicemeeter.status()).finally(()=>{diagnosticsRun=undefined})))

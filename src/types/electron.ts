@@ -48,7 +48,7 @@ export interface AutoEqLibraryGroup {
 
 export type EqProfile = 'atV1' | 'aiwV3' | 'aiwV5'
 
-export type SavedEqFiles = Partial<Record<EqProfile, string>>
+export type SavedEqFiles = Partial<Record<EqProfile | 'aiwMW4', string>>
 
 export interface DeleteSavedEqResult {
   success: boolean
@@ -62,6 +62,8 @@ export interface PreampSettings {
 }
 
 export interface V5Preset {
+  game: 'BO7'|'MW4'
+  hrir: 'Native'|'KEMAR'|'KU100'
   id: string
   name: string
   profile: string
@@ -101,7 +103,7 @@ export interface HeadphoneSearchResult {
 
 export interface AutoEqGenerationProgress {
   completed: number
-  total: 3
+  total: number
   profile: 'AT V1' | 'AIW V3' | 'AIW V5'
   phase: 'generating' | 'completed'
   percent: number
@@ -111,7 +113,7 @@ export interface V5Readiness {
   presetLibrary: boolean
   measurementsLibrary: boolean
   targetsLibrary: boolean
-  plugins: Record<'vstV1' | 'vstV2' | 'jsfxEngine' | 'jsfxEnhancer', boolean>
+  plugins: Record<'vstCharlie' | 'vstV1' | 'vstV2' | 'jsfxEngine' | 'jsfxEnhancer', boolean>
 }
 
 export interface ApplyResult {

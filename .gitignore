@@ -7,6 +7,9 @@ node_modules/
 /light-portable/
 /no-obfuscation/
 /JUSTOCHECK/
+/output/
+/resources/audio-update/*.zip
+/resources/audio-update/*.exe
 *.tsbuildinfo
 .obfuscation-manifest.json
 # Local environments and credentials

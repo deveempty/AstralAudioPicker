@@ -1,4 +1,6 @@
 import {readApoEndpoints} from './apo-diagnostics'
+import {relayChecks} from './relay-diagnostics'
+import type {VmState} from '../shared/voicemeeter'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import {execFile} from 'node:child_process'
@@ -17,7 +19,7 @@ export async function inspectConfigTree(file:string){
  await visit(file,[]);return {missing:[...new Set(missing)],invalid:[...new Set(invalid)],count:visited.size}
 }
 function windowsAudio():Promise<{services:boolean;endpoints:string[]|null}>{return new Promise((resolve,reject)=>{const script=`$ErrorActionPreference='Stop'; $s=@(Get-Service audiosrv,AudioEndpointBuilder); $d=$null; try { $d=@(Get-PnpDevice -Class AudioEndpoint -Status OK | Where-Object { $_.InstanceId -like '*{0.0.0*' } | ForEach-Object { $_.FriendlyName }) } catch {}; @{ services=(@($s | Where-Object Status -ne 'Running').Count -eq 0); endpoints=$d } | ConvertTo-Json -Compress`;execFile('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,timeout:15000,maxBuffer:1024*1024},(error,out)=>{if(error){reject(error);return}try{resolve(JSON.parse(out))}catch(e){reject(e)}})})}
-export async function runDiagnostics():Promise<DiagnosticReport>{
+export async function runDiagnostics(relayStatus?:()=>Promise<VmState>):Promise<DiagnosticReport>{
  const checks:DiagnosticCheck[]=[];const add=(id:string,status:DiagnosticCheck['status'],detail:string,paths?:string[])=>checks.push({id,status,detail,paths})
  const configOk=await readable(MAIN_CONFIG_FILE);let cosmic=false,referenced=false
  add('config',configOk?'ok':'error',configOk?'readable':'missing',[MAIN_CONFIG_FILE])
@@ -29,5 +31,6 @@ export async function runDiagnostics():Promise<DiagnosticReport>{
  add('integrity',dllValid&&settingsValid&&referenced?'ok':'warning',dllValid&&settingsValid&&referenced?'integrityOk':'integrityMissing',!dllValid||!settingsValid||!referenced?[...(!dllValid?[CUSTOM_OUTPUT_DLL]:[]),...(!settingsValid?[stateFile]:[]),...(!referenced?[MAIN_CONFIG_FILE]:[])]:[CUSTOM_OUTPUT_DLL,stateFile])
  try{const system=await windowsAudio();add('services',system.services?'ok':'error',system.services?'servicesRunning':'servicesStopped');const cables=(system.endpoints??[]).filter(n=>/cable/i.test(n));add('cable',system.endpoints===null?'unknown':cables.length?'ok':'warning',system.endpoints===null?'systemUnavailable':cables.length?'cableFound':'cableMissing',cables);if(cosmic)add('device',system.endpoints===null?'unknown':cables.some(n=>/CABLE In 16ch/i.test(n))?'ok':'warning','deviceExpected',cables)}catch{add('services','unknown','systemUnavailable');add('cable','unknown','systemUnavailable')}
  try{const endpoints=await readApoEndpoints();if(!endpoints.length)add('effects','unknown','effectsNoDevice');for(const endpoint of endpoints){const good=endpoint.modes.length>0&&!endpoint.missing&&!endpoint.disabled;checks.push({id:'effects',status:good?'ok':'warning',detail:endpoint.missing?'effectsMissing':endpoint.disabled?'effectsDisabled':endpoint.modes.length?'effectsConfigured':'effectsAbsent',paths:[endpoint.name,...endpoint.modes]})}}catch{add('effects','unknown','systemUnavailable')}
+ if(relayStatus){try{checks.push(...relayChecks(await relayStatus()))}catch{add('relay','unknown','relayUnavailable')}}
  return {checkedAt:Date.now(),checks}
 }

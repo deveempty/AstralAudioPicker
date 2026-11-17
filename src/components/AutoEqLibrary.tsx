@@ -1,3 +1,4 @@
+import {savedEqRows} from './saved-eq-rows'
 import { useEffect, useMemo, useState } from 'react'
 import { Box, Flex, Input, Text, VStack, chakra } from '@chakra-ui/react'
 import { FiCheck, FiHeadphones, FiPlus, FiSearch, FiTrash2, FiX } from 'react-icons/fi'
@@ -7,11 +8,13 @@ import type { AutoEqLibraryGroup, EqProfile, SavedEqFiles } from '../types/elect
 import { useI18n } from '../i18n'
 import { withTimeout } from '../utils/withTimeout'
 
-const PROFILE_ORDER: EqProfile[] = ['atV1', 'aiwV3', 'aiwV5']
+type EqColumn = EqProfile | 'aiwMW4'
+const PROFILE_ORDER: EqColumn[] = ['atV1', 'aiwV3', 'aiwV5', 'aiwMW4']
+const groupFor = (groups:AutoEqLibraryGroup[], profile:EqColumn) => { const group=groups.find(g=>g.id===(profile==='aiwMW4'?'aiwV5':profile));return group && profile==='aiwMW4'?{...group,label:'AIW MW4'}:group }
 type AutoEqFile = AutoEqLibraryGroup['files'][number]
 
 interface ProfileCellProps {
-  group?: AutoEqLibraryGroup
+  group?: Omit<AutoEqLibraryGroup,'label'> & {label:string}
   file?: AutoEqFile
   busy: boolean
   onApply: (profile: EqProfile, filename: string) => void
@@ -38,16 +41,9 @@ export default function AutoEqLibrary() {
   useEffect(() => { void refresh() }, [])
 
   const headphones = useMemo(() => {
-    const records = new Map<string, { name: string; versions: Partial<Record<EqProfile, AutoEqFile>> }>()
-    groups.forEach(group => group.files.forEach(file => {
-      const key = file.name.toLocaleLowerCase()
-      const displayName = `${file.headphoneName}${file.source ? ` - ${file.source}` : ''}`
-      const record = records.get(key) ?? { name: displayName, versions: {} }
-      record.versions[group.id] = file
-      records.set(key, record)
-    }))
+    const records = savedEqRows(groups)
     const normalized = query.trim().toLocaleLowerCase()
-    return [...records.values()].filter(item => !normalized || item.name.toLocaleLowerCase().includes(normalized)).sort((left, right) => left.name.localeCompare(right.name))
+    return records.filter(item => !normalized || item.name.toLocaleLowerCase().includes(normalized)).sort((left, right) => left.name.localeCompare(right.name))
   }, [groups, query])
 
   const apply = async (profile: EqProfile, filename: string) => {
@@ -57,7 +53,7 @@ export default function AutoEqLibrary() {
     try {
       const result = await withTimeout(window.electronAPI.applySavedHeadphoneEq(profile, filename))
       if (!result.success) {
-        setMessage({ text: t('autoeq.applyFailed', { code: result.code ?? t('common.unknown') }), error: true })
+        setMessage({ text: result.code === 'V5_GAME_MISMATCH' ? t('profiles.gameEqMismatch') : result.code === 'V5_GAME_EQ_REQUIRED' ? t('profiles.gameEqRequired') : t('autoeq.applyFailed', { code: result.code ?? t('common.unknown') }), error: true })
         return
       }
       await refresh()
@@ -67,7 +63,7 @@ export default function AutoEqLibrary() {
     } finally { setBusyKey('') }
   }
 
-  const remove = async (name: string, versions: Partial<Record<EqProfile, AutoEqFile>>) => {
+  const remove = async (name: string, versions: Partial<Record<EqColumn, AutoEqFile>>) => {
     const files = Object.fromEntries(PROFILE_ORDER.flatMap(profile => versions[profile] ? [[profile, versions[profile]!.filename]] : [])) as SavedEqFiles
     setBusyKey(`delete:${name}`)
     setMessage(null)
@@ -95,7 +91,7 @@ export default function AutoEqLibrary() {
       <VStack gap="2" align="stretch">{headphones.map(headphone => {
         const active = PROFILE_ORDER.some(profile => {
           const file = headphone.versions[profile]
-          return Boolean(file && groups.find(group => group.id === profile)?.activeFilename?.toLocaleLowerCase() === file.filename.toLocaleLowerCase())
+          return Boolean(file && groupFor(groups,profile)?.activeFilename?.toLocaleLowerCase() === file.filename.toLocaleLowerCase())
         })
         const protectedEq = PROFILE_ORDER.some(profile => headphone.versions[profile]?.filename.toLocaleLowerCase() === 'flat.txt')
         const confirming = pendingDelete === headphone.name
@@ -105,7 +101,7 @@ export default function AutoEqLibrary() {
         return <Flex key={headphone.name} minH="66px" px="3" py="2" align="center" gap="3" borderRadius="12px" bg="rgba(255,255,255,.022)" border="1px solid rgba(255,255,255,.075)">
           <Flex w="34px" h="34px" flexShrink="0" align="center" justify="center" borderRadius="9px" bg="rgba(139,92,246,.13)" color="purple.300"><FiHeadphones size="16" /></Flex>
           <Box flex="1" minW="0"><Text color="white" fontSize="12px" fontWeight="750" truncate>{headphone.name}</Text><Text color="purple.200" fontSize="9px">{t('eq.savedAutoEq')}</Text></Box>
-          <Flex gap="1.5">{PROFILE_ORDER.map(profile => <ProfileCell key={profile} group={groups.find(item => item.id === profile)} file={headphone.versions[profile]} busy={Boolean(busyKey)} onApply={apply} />)}</Flex>
+          <Flex gap="1.5">{PROFILE_ORDER.map(profile => <ProfileCell key={profile} group={groupFor(groups,profile)} file={headphone.versions[profile]} busy={Boolean(busyKey)} onApply={apply} />)}</Flex>
           {confirming ? <Flex minW="116px" justify="end" gap="1.5"><chakra.button type="button" w="30px" h="30px" display="flex" alignItems="center" justifyContent="center" borderRadius="8px" color="whiteAlpha.550" aria-label={t('common.cancel')} title={t('common.cancel')} onClick={() => setPendingDelete('')}><FiX /></chakra.button><chakra.button type="button" h="30px" px="2.5" borderRadius="8px" border="1px solid rgba(251,113,133,.4)" bg="rgba(251,113,133,.1)" color="red.300" fontSize="10px" fontWeight="750" disabled={deleting} onClick={() => void remove(headphone.name, headphone.versions)}>{t('eq.deleteConfirm')}</chakra.button></Flex> : <chakra.button type="button" w="32px" h="32px" flexShrink="0" display="flex" alignItems="center" justifyContent="center" borderRadius="9px" color="whiteAlpha.350" cursor={deleteBlocked ? 'not-allowed' : 'pointer'} opacity={deleteBlocked ? .3 : 1} disabled={deleteBlocked} aria-label={deleteTitle} title={deleteTitle} onClick={() => setPendingDelete(headphone.name)} _hover={deleteBlocked ? {} : { color: 'red.300', bg: 'rgba(251,113,133,.08)' }}><FiTrash2 size="14" /></chakra.button>}
         </Flex>
       })}

@@ -1,7 +1,7 @@
 {
   "name": "astral-audio-picker",
   "private": true,
-  "version": "3.1.8",
+  "version": "3.1.10",
   "description": "Audio Switcher - Astral Tweaks",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -11,8 +11,8 @@
     "validate:package": "node tools-dev/validate-package.mjs",
     "audit:spatial": "powershell -NoProfile -ExecutionPolicy Bypass -File tools-dev/run-spatial-audit.ps1",
     "lab:tune": "powershell -NoProfile -ExecutionPolicy Bypass -File tools-dev/tune-lab/start-tune-lab.ps1",
-    "build": "npm run validate:payload && npm run typecheck && vite build && node scripts/obfuscate.cjs && electron-builder && node scripts/update-policy.mjs",
-    "build:portable": "npm run validate:payload && npm run typecheck && vite build && node scripts/obfuscate.cjs && electron-builder --win portable",
+    "build": "npm run validate:payload && npm run validate:audio-update && npm run typecheck && vite build && node scripts/obfuscate.cjs && electron-builder && node scripts/update-policy.mjs",
+    "build:portable": "npm run validate:payload && npm run validate:audio-update && npm run typecheck && vite build && node scripts/obfuscate.cjs && electron-builder --win portable",
     "publish:update": "npm run release",
     "preview": "vite preview",
     "electron:dev": "vite",
@@ -20,13 +20,18 @@
     "typecheck": "npm run typecheck:electron && tsc --noEmit",
     "dev:auth": "vite --mode auth-test",
     "release": "node scripts/release.mjs",
-    "release:execute": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-update.ps1"
+    "release:execute": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-update.ps1",
+    "lab:relay-migration": "node tools-dev/relay-migration/run.cjs",
+    "test:relay-migration": "node tools-dev/relay-migration/scenarios.cjs",
+    "validate:audio-update": "node scripts/validate-audio-update.cjs",
+    "test:audio-upgrade": "node tools-dev/audio-download-smoke.cjs && node tools-dev/audio-upgrade-relay-smoke.cjs && node tools-dev/audio-upgrade-content-smoke.cjs"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.2.1",
     "@emotion/react": "^11.13.3",
     "electron-updater": "^6.8.9",
     "framer-motion": "^11.15.0",
+    "koffi": "3.3.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^5.4.0"

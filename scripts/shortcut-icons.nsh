@@ -12,3 +12,17 @@
     System::Call 'shell32::SHChangeNotify(i 0x2000, i 0x5, w "$newDesktopLink", p 0)'
   ${endIf}
 !macroend
+
+!macro customUnInit
+ ${ifNot} ${isUpdated}
+  InitPluginsDir
+  CopyFiles /SILENT "$INSTDIR\resources\scripts\RemoveRelayStartup.ps1" "$PLUGINSDIR\RemoveRelayStartup.ps1"
+  CopyFiles /SILENT "$INSTDIR\resources\scripts\RelayStartup.ps1" "$PLUGINSDIR\RelayStartup.ps1"
+ ${endIf}
+!macroend
+
+!macro customUnInstall
+ ${ifNot} ${isUpdated}
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\RemoveRelayStartup.ps1" -AppExecutable "$INSTDIR\${APP_EXECUTABLE_FILENAME}"'
+ ${endIf}
+!macroend
