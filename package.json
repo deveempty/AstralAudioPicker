@@ -1,7 +1,7 @@
 {
   "name": "astral-audio-picker",
   "private": true,
-  "version": "3.1.10",
+  "version": "3.1.12",
   "description": "Audio Switcher - Astral Tweaks",
   "main": "dist-electron/main.js",
   "scripts": {

@@ -4,7 +4,7 @@ import {promisify} from 'node:util'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 
-const migrationId='endpoint-icons-v2-normal-audio'
+const migrationId='endpoint-icons-v3-stock-cable'
 // One-time migration shipped by Picker for existing installations. The marker
 // is machine-wide and independent of app version; failures may retry next launch.
 // Cosmetic failures must never block access to the app.

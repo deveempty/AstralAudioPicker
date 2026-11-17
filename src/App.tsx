@@ -80,7 +80,7 @@ export default function App() {
     try {
       const result = await window.electronAPI.setMainConfig(value)
       if (result.success) { setConfig(result.state); setStatus(t('common.applied')); await refresh() }
-      else setStatus(t(result.code === 'CUSTOM_OUTPUT_NOT_INSTALLED' ? 'profiles.cosmicMissing' : 'common.failed'))
+      else setStatus(t(result.code === 'CUSTOM_OUTPUT_NOT_INSTALLED' ? 'profiles.cosmicMissing' : result.code === 'AUDIO_ENDPOINT_SWITCH_FAILED' ? 'profiles.endpointFailed' : result.code === 'CONFIG_WRITE_FAILED' ? 'profiles.configFailed' : 'common.failed'))
     } catch { setStatus(t('common.failed')) }
     finally { setApplying(false) }
   }

@@ -1,3 +1,4 @@
+import {switchVerifiedCable} from './cable-switch'
 import {matchingGameEq} from './v5-game-eq'
 import {parseV5Preset} from '../shared/v5-catalog'
 import {updateEndpointIcons} from './endpoint-icons'
@@ -53,6 +54,8 @@ const CONFIG_FILE = path.join(CONFIG_PATH, 'config.txt')
 const AT_V2_FILE = path.join(CONFIG_PATH, 'at_v2.txt')
 const AIW_V3_FILE = path.join(CONFIG_PATH, 'aiw_v3.txt')
 
+let endpointPreparation: Promise<void> = Promise.resolve()
+let profileQueue: Promise<unknown> = Promise.resolve()
 let audioAccess: ReturnType<typeof createAudioAccess>
 let win: BrowserWindow | null = null
 
@@ -90,7 +93,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   if(!primaryInstance)return
-  void updateEndpointIcons().catch(error=>console.warn('Endpoint icon update deferred:',error instanceof Error?error.message:String(error)))
+  endpointPreparation = updateEndpointIcons().catch(error=>console.warn('Endpoint icon update deferred:',error instanceof Error?error.message:String(error)))
   const icon=app.isPackaged?path.join(process.resourcesPath,'branding','appicon.ico'):path.join(app.getAppPath(),'src','assets','appicon.ico')
   try{
     tray=new Tray(icon);tray.setToolTip('Astral Audio');tray.on('click',showAudioWindow)
@@ -338,6 +341,7 @@ Write-Output "OK"
 }
 
 async function setMainProfile(selection: 'none' | 'v1' | 'v2' | 'aiwv2' | 'aiwv5' | 'custom') {
+  await endpointPreparation
   if (!['none','v1','v2','aiwv2','aiwv5','custom'].includes(selection)) return {success:false,state:readConfigState(),code:'INVALID_PROFILE'}
   if (selection === 'custom') { try { await audioAccess.requireReady() } catch { return {success:false,state:readConfigState(),code:'LOGIN_REQUIRED'} } }
   if (selection === 'custom' && !fs.existsSync(CUSTOM_OUTPUT_DLL)) return {success:false,state:readConfigState(),code:'CUSTOM_OUTPUT_NOT_INSTALLED'}
@@ -358,9 +362,13 @@ async function setMainProfile(selection: 'none' | 'v1' | 'v2' | 'aiwv2' | 'aiwv5
 
   const state = readConfigState()
   if (success && routed && selection === 'aiwv5') state.mainConfig = 'aiwv5'
-  return { success: success && routed, state, code: routed ? undefined : 'AUDIO_ENDPOINT_SWITCH_FAILED' }
+  return { success: success && routed, state, code: !success ? 'CONFIG_WRITE_FAILED' : routed ? undefined : 'AUDIO_ENDPOINT_SWITCH_FAILED' }
 }
-handlePicker('set-main-config', (_event, selection) => setMainProfile(selection))
+handlePicker('set-main-config', (_event, selection) => {
+  const pending = profileQueue.then(() => setMainProfile(selection))
+  profileQueue = pending.catch(() => undefined)
+  return pending
+})
 
 handlePicker('set-v2-sub', async (_event, subKey: string) => {
   const success = updateV2Sub(subKey)
@@ -499,7 +507,7 @@ handlePicker('disable-voicemeeter-endpoints', () => runElevatedAudioTask('Astral
 $ErrorActionPreference = 'Stop'
 $nameKey = '{a45c254e-df1c-4efd-8020-67d146a850e0},2'
 $roots = @(
-  @{ Ps = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render'; Native = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render'; Kind = 'Render' },
+  @{ Ps = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render'; Native = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render'; Kind = 'Render' },
   @{ Ps = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture'; Native = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture'; Kind = 'Capture' }
 )
 $changed = 0
@@ -569,16 +577,30 @@ async function setEndpointEnabled(deviceName: string, enabled: boolean): Promise
 // Keep exactly one Astral cable endpoint active. Enabling the destination first
 // prevents a failed switch from leaving Windows without an available output.
 async function switchCableEndpoint(target: CableEndpoint): Promise<boolean> {
-  const targetName = target === 'v5' ? V5_DEVICE_NAME : LEGACY_DEVICE_NAME
-  const previousName = target === 'v5' ? LEGACY_DEVICE_NAME : V5_DEVICE_NAME
-  const targetWasActive = await getEndpointState(targetName) === 'active'
-
-  if (!await setEndpointEnabled(targetName, true)) return false
-  if (await setEndpointEnabled(previousName, false)) return true
-
-  // The old endpoint is still available, so restore the original route.
-  await setEndpointEnabled(targetName, false)
-  return false
+  // Resolve exact render endpoints by adapter and role; never use a developer GUID.
+  const script = String.raw`$ErrorActionPreference='Stop'
+$found=@(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render' | ForEach-Object {
+ $p=Get-ItemProperty -LiteralPath (Join-Path $_.PSPath 'Properties')
+ if($p.'{b3f8fa53-0004-438e-9003-51a46e139bfc},6' -eq 'VB-Audio Virtual Cable'){
+  $name=$p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2'; $role=$null
+  if($name -eq 'Cable Input 7.1' -or ($name -eq 'CABLE Input' -and $p.'{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},0' -eq 1)){$role='legacy'}
+  if($name -eq 'CABLE In 16ch'){$role='v5'}
+  if($role){@{role=$role;id=('{0.0.0.00000000}.'+$_.PSChildName)}}
+ }
+})
+ConvertTo-Json -InputObject $found -Compress`
+  try {
+    const endpoints = await new Promise<Array<{role:string;id:string}>>((resolve,reject)=>{
+      execFile('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,timeout:10000},(error,stdout)=>{
+        if(error)return reject(error)
+        try{resolve(JSON.parse(stdout))}catch(e){reject(e)}
+      })
+    })
+    const destination=endpoints.filter(e=>e.role===target)
+    const previous=endpoints.filter(e=>e.role!==target)
+    if(destination.length!==1||previous.length!==1)return false
+    return await switchVerifiedCable(destination[0].id,previous[0].id,getEndpointState,setEndpointEnabled)
+  } catch { return false }
 }
 
 // Get current channel config by exporting device info from svcl.exe

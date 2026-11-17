@@ -8,21 +8,23 @@ $files=@('astral-audio-switch-borde-gradient.ico','astral-audio-output-mix-v2.ic
 foreach($file in $files){if(-not (Test-Path -LiteralPath (Join-Path $SourceDirectory $file))){throw "Missing icon: $file"}}
 $nameKey='{a45c254e-df1c-4efd-8020-67d146a850e0},2'
 $adapterKey='{b3f8fa53-0004-438e-9003-51a46e139bfc},6'
+$formKey='{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},0'
 $iconKey='{259abffc-50a7-47ce-af08-68c9a7d73366},12'
 $changes=@()
 foreach($flow in @('Render','Capture')){
  $root="SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\$flow"
  foreach($endpoint in Get-ChildItem "Registry::HKEY_LOCAL_MACHINE\$root"){
   $props=Get-ItemProperty -LiteralPath (Join-Path $endpoint.PSPath 'Properties')
-  $name=[string]$props.$nameKey; $adapter=[string]$props.$adapterKey; $file=$null
+  $name=[string]$props.$nameKey; $adapter=[string]$props.$adapterKey; $file=$null; $newName=$name
   if($adapter -eq 'VB-Audio Virtual Cable'){
+   if($flow -eq 'Render' -and $name -eq 'CABLE Input' -and $props.$formKey -eq 1){$newName='Cable Input 7.1';$file=$files[0]}
    if($flow -eq 'Render' -and $name -in @('Cable Input 7.1','CABLE In 16ch')){$file=$files[0]}
    if($flow -eq 'Capture' -and $name -eq 'CABLE Output'){$file=$files[1]}
   }elseif($adapter -like 'VB-Audio Voicemeeter*' -and $name -like 'Voicemeeter *'){$file=$files[2]}
   if(-not $file){continue}
   $target=(Join-Path $DestinationDirectory $file)+',0'
-  if([string]$props.$iconKey -eq $target){continue}
-  $changes+=@{flow=$flow;id=$endpoint.PSChildName;name=$name;previous=$props.$iconKey;target=$target;key="$root\$($endpoint.PSChildName)\Properties"}
+  if([string]$props.$iconKey -eq $target -and $newName -eq $name){continue}
+  $changes+=@{flow=$flow;id=$endpoint.PSChildName;name=$name;newName=$newName;previous=$props.$iconKey;target=$target;key="$root\$($endpoint.PSChildName)\Properties"}
  }
 }
 if($Apply){
@@ -41,8 +43,10 @@ if($Apply){
   try{
    $key=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey($change.key,[Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree,[System.Security.AccessControl.RegistryRights]::SetValue)
    if($null -eq $key){throw 'Endpoint disappeared'}
+   $key.SetValue($nameKey,$change.newName,[Microsoft.Win32.RegistryValueKind]::String)
    $key.SetValue($iconKey,$change.target,[Microsoft.Win32.RegistryValueKind]::String)
   }finally{if($null -ne $key){$key.Dispose()}}
+  if((Get-ItemProperty -LiteralPath ('Registry::HKEY_LOCAL_MACHINE\'+$change.key)).$nameKey -ne $change.newName){throw 'Name readback mismatch'}
   if((Get-ItemProperty -LiteralPath ('Registry::HKEY_LOCAL_MACHINE\'+$change.key)).$iconKey -ne $change.target){throw 'Icon readback mismatch'}
  }
 }

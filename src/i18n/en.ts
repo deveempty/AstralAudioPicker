@@ -506,4 +506,6 @@ export const en = {
   "plugin.error.missingPreset": "The selected preset is no longer available.",
   "plugin.error.invalidPreset": "The preset file is invalid. Your current settings were kept.",
   "plugin.error.stale": "The configuration changed before saving. Review it and save again.",
+"profiles.endpointFailed": "Could not switch the VB-Cable outputs. Check that both the 7.1 and 16-channel devices are installed. Your previous profile was restored.",
+  "profiles.configFailed": "Could not save Equalizer APO configuration. Check the audio installation and write permissions.",
 } as const
