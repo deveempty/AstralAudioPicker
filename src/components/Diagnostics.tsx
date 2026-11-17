@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react'
 import {FiCheckCircle,FiAlertCircle,FiHelpCircle,FiRefreshCw} from 'react-icons/fi'
 import AstralButton from './ui/AstralButton'
+import AudioRepair from './AudioRepair'
 import {useI18n,type TranslationKey} from '../i18n'
 import type {DiagnosticReport} from '../../shared/diagnostics'
 export default function Diagnostics(){
@@ -12,6 +13,7 @@ export default function Diagnostics(){
  return <section className="diagnostics-page" aria-busy={busy}>
   <div className="diagnostics-summary"><div><span>{tr('overview')}</span><h2 role="status">{tr(busy?'scanning':failed?'failed':!report?'idle':issues?'attention':unknown?'partial':'healthy')}</h2><p>{tr('scope')}</p>{report?<small>{tr('lastScan')} {new Date(report.checkedAt).toLocaleTimeString(language,{hour:'2-digit',minute:'2-digit',second:'2-digit'})} | {issues} {tr('issues')} | {unknown} {tr('unknown')}</small>:null}</div><AstralButton disabled={busy} icon={<FiRefreshCw/>} onClick={()=>void scan()}>{tr(busy?'scanning':'scan')}</AstralButton></div>
   {failed?<p role="alert">{tr('retryHelp')}</p>:null}
+  {report?.checks.some(c=>c.id==='loudnessChain')?<div style={{marginBottom:20}}><AudioRepair onChecked={()=>void scan()}/></div>:null}
   <div className="diagnostics-list">{report?.checks.map((check,index)=><article key={check.id+'-'+index} className="diagnostics-row" data-status={check.status}><div className="diagnostics-label">{check.status==='ok'?<FiCheckCircle/>:check.status==='error'||check.status==='warning'?<FiAlertCircle/>:<FiHelpCircle/>}<strong>{tr(check.id)}</strong></div><div><p>{tr(check.detail,check.values)}</p>{check.paths?.map(p=><small key={p}>{p}</small>)}</div><span className="diagnostics-badge">{tr(check.status)}</span></article>)}</div>
  </section>
 }

@@ -1,4 +1,12 @@
 export const communityEn = {
+  'community.loudnessTag': 'Loudness EQ',
+  'community.loudnessHelp': 'Applies Windows Loudness EQ on CABLE In 16ch, including its release time. Audio pauses briefly.',
+  'community.loudnessPublish': 'Your current Loudness EQ setting is included when sharing current settings. Saved presets use the setting captured when saved; older presets have no Loudness EQ information.',
+  'community.errorLoudnessRead': 'Could not read Loudness EQ on the 16-channel cable. Check Audio diagnostics and try again.',
+  'community.errorLoudnessApply': 'Could not apply Loudness EQ on the 16-channel cable. The profile was not applied. Check Audio diagnostics and retry.',
+  'community.errorLoudnessRestore': 'Could not restore Loudness EQ after an error. Check Audio diagnostics or open a support ticket before continuing.',
+  'community.errorLoudnessService': 'Community needs a service update to share Loudness EQ. Your profile has not been published.',
+  'plugin.error.loudnessUnavailable': 'Could not read Loudness EQ. Check the 16-channel cable in Diagnostics, then save your profile again.',
   'community.mine': 'My profiles',
   'community.refresh': 'Refresh',
   'community.presetAuthor': 'Community \u00b7 {author}',
@@ -92,6 +100,14 @@ export const communityEn = {
 } as const
 
 export const communityEs: Record<keyof typeof communityEn, string> = {
+  'community.loudnessTag': 'Loudness EQ',
+  'community.loudnessHelp': 'Aplica Loudness EQ de Windows en CABLE In 16ch, incluido su tiempo de liberación. El audio se pausa brevemente.',
+  'community.loudnessPublish': 'Al compartir los ajustes actuales se incluye el estado actual de Loudness EQ. Los perfiles guardados usan el estado que tenían al guardarse; los antiguos no contienen esta información.',
+  'community.errorLoudnessRead': 'No se pudo leer Loudness EQ en el cable de 16 canales. Revisa Diagnóstico de audio y reintenta.',
+  'community.errorLoudnessApply': 'No se pudo aplicar Loudness EQ en el cable de 16 canales. El perfil no se aplicó. Revisa Diagnóstico de audio y reintenta.',
+  'community.errorLoudnessRestore': 'No se pudo restaurar Loudness EQ tras un error. Revisa Diagnóstico de audio o abre un ticket de soporte antes de continuar.',
+  'community.errorLoudnessService': 'Comunidad necesita una actualización del servicio para compartir Loudness EQ. Tu perfil no se ha publicado.',
+  'plugin.error.loudnessUnavailable': 'No se pudo leer Loudness EQ. Revisa el cable de 16 canales en Diagnóstico y vuelve a guardar tu perfil.',
   'community.mine': 'Mis perfiles',
   'community.refresh': 'Actualizar',
   'community.presetAuthor': 'Comunidad \u00b7 {author}',

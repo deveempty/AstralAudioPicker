@@ -5,6 +5,7 @@ import {useEffect,useState,type ReactNode} from 'react'
 import AstralButton from './ui/AstralButton'
 import {useI18n,type TranslationKey} from '../i18n'
 import type {AudioAccessStatus} from '../../shared/audio-access'
+import AudioSupportError from './AudioSupportError'
 export default function AudioAccessGate({children}:{children:ReactNode}){
  const {t}=useI18n(),[state,setState]=useState<AudioAccessStatus>({phase:'checking'}),[busy,setBusy]=useState(false)
  useEffect(()=>{let alive=true,pending=false;const poll=async()=>{if(pending)return;pending=true;try{const s=await window.electronAPI.audioAccessStatus();if(alive)setState(s)}catch{if(alive)setState({phase:'error',code:'AUTH_UNAVAILABLE'})}finally{pending=false}};void poll();const timer=setInterval(()=>void poll(),500);return()=>{alive=false;clearInterval(timer)}},[])
@@ -21,6 +22,7 @@ export default function AudioAccessGate({children}:{children:ReactNode}){
    <p>{t(state.username?'audioAccess.prepareHelp':'login.description')}</p>
    {state.phase==='error'?<div className="audio-login-error" role="alert">{t(state.code==='DISCORD_RATE_LIMITED'?'audioAccess.rateLimited':state.code==='ROLE_REQUIRED'?'audioAccess.role':state.code==='HWID_MISMATCH'?'audioAccess.hwid':state.username?'audioAccess.prepareFailed':('audioAccess.'+code) as TranslationKey)}{state.code&&state.code!=='ROLE_REQUIRED'&&/^[A-Z][A-Z0-9_]{1,63}$/.test(state.code)?<small style={{display:'block',marginTop:8}}>{state.stage} / {state.code}</small>:null}</div>:null}
    {state.phase==='error'&&state.code==='ROLE_REQUIRED'?<p className="audio-login-ticket-help">{t('audioAccess.previousCustomer')}</p>:null}
+   {state.phase==='error'&&state.stage!=='authentication'?<AudioSupportError code={state.code==='EEXIST'?'COSMIC_LOCK_RECOVERY_REQUIRED':state.code} stage={state.stage}/>:null}
    <div className="audio-login-actions">
     {!state.username?<AstralButton disabled={waiting||busy} icon={<FiArrowRight aria-hidden="true"/>} onClick={()=>void run('login')}>{t(busy?'login.waiting':'audioAccess.login')}</AstralButton>:null}
     {state.phase==='error'?<AstralButton disabled={busy} variant="ghost" onClick={()=>void run('retry')}>{t('audioAccess.retry')}</AstralButton>:null}

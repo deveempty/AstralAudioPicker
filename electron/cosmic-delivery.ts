@@ -1,3 +1,4 @@
+import {acquireCosmicLock} from './cosmic-lock'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
@@ -38,7 +39,7 @@ export async function reconcileCosmicDelivery(options:CosmicDeliveryOptions):Pro
  const token=await options.authorize();if(!token)throw Error('ACCESS_DENIED')
  await fs.mkdir(options.installDirectory,{recursive:true})
  const dll=path.join(options.installDirectory,'Cosmic.dll'),lock=path.join(options.installDirectory,'cosmic-install.lock')
- const handle=await fs.open(lock,'wx');const temp=dll+'.'+randomUUID()+'.download'
+ const releaseLock=await acquireCosmicLock(lock);const temp=dll+'.'+randomUUID()+'.download'
  let backupDll:Buffer|null=null,committed=false
  try {
   const original=await fs.readFile(options.configFile)
@@ -69,5 +70,5 @@ export async function reconcileCosmicDelivery(options:CosmicDeliveryOptions):Pro
  }catch(error){
   if(committed){if(backupDll){const rollback=dll+'.'+randomUUID()+'.rollback';await fs.writeFile(rollback,backupDll);await fs.rename(rollback,dll)}else await fs.rm(dll,{force:true})}
   throw error
- }finally{await fs.rm(temp,{force:true});await handle.close();await fs.rm(lock,{force:true})}
+ }finally{await fs.rm(temp,{force:true});await releaseLock()}
 }

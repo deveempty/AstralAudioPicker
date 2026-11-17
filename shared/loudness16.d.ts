@@ -8,3 +8,8 @@ export type Loudness16Change = {
 } | {
     releaseTime: number;
 };
+export interface LoudnessEqSettings {
+    enabled: boolean;
+    releaseTime: number;
+}
+export declare function validLoudnessEqSettings(value: unknown): value is LoudnessEqSettings;

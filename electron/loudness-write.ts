@@ -45,7 +45,7 @@ try {
  $device=Get-PnpDevice -InstanceId $instanceId -ErrorAction Stop
  if($device.Class -ne 'AudioEndpoint'){throw 'Unexpected device class'}
  $endpointState=(Get-ItemProperty -LiteralPath 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render\\${id}' -Name DeviceState).DeviceState
- if($endpointState -eq 2){
+ if(($endpointState -band 15) -eq 2 -or ($endpointState -band 0x10000000) -ne 0){
   # A disabled endpoint adopts its saved effects when enabled next; preserve routing.
   @{ok=$true} | ConvertTo-Json -Compress | Set-Content -LiteralPath ${quote(resultPath)} -Encoding UTF8
   exit 0

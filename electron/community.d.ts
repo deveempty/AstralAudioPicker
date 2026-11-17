@@ -1,7 +1,9 @@
+import { type CommunityLoudness } from './community-loudness';
 import { type CommunityApplied, type CommunityProfile, type CommunityPublication, type CommunityQuery, type CommunityResult } from '../shared/community';
 import type { PluginControlStore } from './plugin-control';
 export declare function createCommunity(options: {
     request: (route: string, init?: RequestInit) => Promise<Response>;
+    loudness?: CommunityLoudness;
     store: PluginControlStore;
     isCosmicActive: () => boolean;
     activateCosmic: () => Promise<() => Promise<void>>;

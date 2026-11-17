@@ -10,7 +10,7 @@ import ts from 'typescript';
 import { communityRequest, validPayload } from '../cloudflare-community/community.mjs';
 
 const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'astral-community-tests-'));
-for(const file of ['src/community-library','shared/plugin-control','shared/community','electron/plugin-presets','electron/plugin-control','electron/community']){
+for(const file of ['src/community-library','shared/loudness16','electron/community-loudness','shared/plugin-control','shared/community','electron/plugin-presets','electron/plugin-control','electron/community']){
   const dest=path.join(scratch,file+'.cjs');fs.mkdirSync(path.dirname(dest),{recursive:true});
   let output=ts.transpileModule(fs.readFileSync(new URL('../'+file+'.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText;
   output=output.replace(/require\("(\.[^"]+)"\)/g,'require("$1.cjs")');fs.writeFileSync(dest,output);
@@ -26,6 +26,7 @@ test.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
 function fixture(){
   const sqlite=new DatabaseSync(':memory:');sqlite.exec(fs.readFileSync(new URL('../cloudflare-community/migration.sql',import.meta.url),'utf8'));
   sqlite.exec(fs.readFileSync(new URL('../cloudflare-community/0002_applications.sql',import.meta.url),'utf8'));
+  sqlite.exec(fs.readFileSync(new URL('../cloudflare-community/0003_loudness_eq.sql',import.meta.url),'utf8'));
   const db={prepare(sql){
     return {bind(...args){
       return {
@@ -210,4 +211,66 @@ test('Installed Worker blocks private R2 objects through the legacy API-key rout
     const response=await worker.fetch(new Request('https://test'+route,{headers:{'X-Audio-API-Key':'test'}}),{AUDIO_API_KEY:'test'},{});assert.equal(response.status,403);
   }
   assert.equal((await worker.fetch(new Request('https://test/community/profiles'),{},{})).status,503);
+});
+
+function loudnessFixture(initial={enabled:false,releaseTime:40}) {
+ const state={deviceId:'local-16ch-only',...initial},calls=[];
+ return {state,calls,read:async()=>({...state}),change:async change=>{calls.push(change);Object.assign(state,change);return {...state}},changed:()=>calls.push('changed')};
+}
+function communityClient(f,loudness) {
+ const dir=path.join(scratch,randomUUID()),store=new PluginControlStore(dir,path.join(dir,'library'));store.get();
+ const get=store.get.bind(store);store.get=()=>{const r=get();if(r.success)r.snapshot.instances=[{updatedAt:Date.now(),audioService:true,processing:true,audioRevision:r.snapshot.state.revision,evidence:{state:1,hash:pluginFingerprint(r.snapshot.state.values)}}];return r};
+ let active=false;
+ const api=createCommunity({store,loudness,request:(route,init={})=>f.call(route.slice('/community/profiles'.length),init.method||'GET',init.body?JSON.parse(init.body):undefined),isCosmicActive:()=>active,activateCosmic:async()=>{const previous=active;active=true;return async()=>{active=previous}}});
+ return {api,store,active:()=>active};
+}
+test('Loudness metadata survives publish, favorites and application; undo restores local LEQ',async()=>{
+ const f=fixture(),authorLEQ=loudnessFixture({enabled:true,releaseTime:0}),author=communityClient(f,authorLEQ),pub=publication();
+ const published=await author.api.publish({...pub,source:'current',revision:author.store.get().snapshot.state.revision});assert.equal(published.success,true);
+ const listing=(await(await f.call()).json()).profiles[0];assert.deepEqual(listing.loudnessEq,{enabled:true,releaseTime:0});
+ await f.call('/'+pub.requestId+'/favorite','PUT',undefined,'bob');assert.deepEqual((await(await f.call('?tab=saved','GET',undefined,'bob')).json()).profiles[0].loudnessEq,listing.loudnessEq);
+ const raw=[...f.objects.values()][0];assert(!raw.includes('local-16ch-only'));assert.equal(JSON.parse(raw).loudnessEq.enabled,true);
+ const receiverLEQ=loudnessFixture(),receiver=communityClient(f,receiverLEQ),result=await receiver.api.apply(pub.requestId);assert.equal(result.success,true);assert.equal(result.data.engineConfirmed,true);assert.deepEqual(receiverLEQ.calls.filter(c=>typeof c==='object'),[{releaseTime:0},{enabled:true}]);
+ assert.equal((await receiver.api.undo()).success,true);assert.equal(receiverLEQ.state.enabled,false);assert.equal(receiverLEQ.state.releaseTime,40);f.sqlite.close();
+});
+test('Saved presets keep LEQ when read/imported and publish their saved state, not current Windows state',async()=>{
+ const f=fixture(),loudness=loudnessFixture({enabled:false,releaseTime:100}),client=communityClient(f,loudness),state=client.store.get().snapshot.state;
+ const saved=client.store.saveNamed('Saved with LEQ',state.revision,{enabled:true,releaseTime:20});assert.equal(saved.success,true);const preset=client.store.library.read(saved.savedId);assert.deepEqual(preset.loudnessEq,{enabled:true,releaseTime:20});
+ const imported=client.store.library.importFile(JSON.stringify({schema:'astral-v3-named-preset',version:1,stateVersion:3,...preset}));assert.deepEqual(imported.loudnessEq,preset.loudnessEq);
+ const pub=publication();assert.equal((await client.api.publish({...pub,source:preset.id,revision:state.revision})).success,true);assert.deepEqual((await(await f.call()).json()).profiles[0].loudnessEq,preset.loudnessEq);
+ const legacy=client.store.library.save('Old preset',state.values);assert.equal(legacy.loudnessEq,undefined);f.sqlite.close();
+});
+test('Malformed LEQ is rejected and changing LEQ invalidates payload integrity',async()=>{
+ const f=fixture();for(const loudnessEq of [null,{},true,{enabled:1,releaseTime:0},{enabled:true,releaseTime:5},{enabled:true,releaseTime:0,deviceId:'forged'}]){
+ const p={...payload(),loudnessEq};assert.equal(validPayload(p),false);assert.equal(validCommunityPayload(p),false);assert.equal((await f.call('','POST',{...publication(),payload:p})).status,400);
+ }
+ const loudness=loudnessFixture(),dir=path.join(scratch,randomUUID()),store=new PluginControlStore(dir,path.join(dir,'library'));store.get();const p={...payload(),loudnessEq:{enabled:true,releaseTime:0}},data={id:randomUUID(),version:1,payload:p,sha256:createHash('sha256').update(JSON.stringify(p)).digest('hex')};p.loudnessEq.enabled=false;
+ const api=createCommunity({store,loudness,request:async()=>Response.json(data),isCosmicActive:()=>true,activateCosmic:async()=>{throw Error('must not route')}});assert.equal((await api.apply(data.id)).code,'INVALID_PROFILE');assert.equal(loudness.calls.length,0);f.sqlite.close();
+});
+test('LEQ failure restores settings and routing without applying Cosmic or counting success',async()=>{
+ const f=fixture(),pub=publication();pub.payload.loudnessEq={enabled:true,releaseTime:0};await f.call('','POST',pub);
+ const loudness=loudnessFixture(),realChange=loudness.change;loudness.change=async change=>{if(change.enabled===true)throw Error('denied');return realChange(change)};
+ const client=communityClient(f,loudness),before=client.store.get().snapshot.state.revision;
+ assert.equal((await client.api.apply(pub.requestId)).code,'COMMUNITY_LOUDNESS_APPLY_FAILED');assert.equal(loudness.state.releaseTime,40);assert.equal(loudness.state.enabled,false);assert.equal(client.active(),false);assert.equal(client.store.get().snapshot.state.revision,before);assert.equal((await(await f.call()).json()).profiles[0].applications,0);f.sqlite.close();
+});
+test('LEQ read failures are actionable; old profiles preserve LEQ and old services cannot silently drop it',async()=>{
+ const f=fixture(),legacy=publication();await f.call('','POST',legacy);const loudness=loudnessFixture();loudness.read=async()=>{throw Error('unavailable')};const client=communityClient(f,loudness);
+ assert.equal((await client.api.apply(legacy.requestId)).success,true);assert.equal(loudness.calls.length,0);
+ assert.equal((await client.api.publish({...publication(),source:'current',revision:client.store.get().snapshot.state.revision})).code,'COMMUNITY_LOUDNESS_READ_FAILED');
+ let posts=0;const api=createCommunity({store:client.store,loudness:loudnessFixture(),request:async(_route,init)=>{if(init?.method==='POST')posts++;return Response.json({profiles:[],more:false})},isCosmicActive:()=>true,activateCosmic:async()=>async()=>{}});
+ assert.equal((await api.publish({...publication(),source:'current',revision:client.store.get().snapshot.state.revision})).code,'COMMUNITY_LOUDNESS_SERVICE_REQUIRED');assert.equal(posts,0);f.sqlite.close();
+});
+test('Undo will not overwrite a later manual Loudness adjustment',async()=>{
+ const f=fixture(),pub=publication();pub.payload.loudnessEq={enabled:true,releaseTime:0};await f.call('','POST',pub);const loudness=loudnessFixture(),client=communityClient(f,loudness);assert.equal((await client.api.apply(pub.requestId)).success,true);loudness.state.releaseTime=80;const calls=loudness.calls.length;assert.equal((await client.api.undo()).code,'stale');assert.equal(loudness.calls.length,calls);assert.equal(loudness.state.releaseTime,80);f.sqlite.close();
+});
+
+test('Unverified APO chain prevents Community success and restores the previous LEQ setting',async()=>{
+ const f=fixture(),pub=publication();pub.payload.loudnessEq={enabled:true,releaseTime:0};await f.call('','POST',pub);
+ const loudness=loudnessFixture();let verified='';loudness.verifyActive=async id=>{verified=id;throw Error('APO_CHAIN_UNCONFIRMED')};const client=communityClient(f,loudness),before=client.store.get().snapshot.state.revision;
+ assert.equal((await client.api.apply(pub.requestId)).code,'COMMUNITY_LOUDNESS_APPLY_FAILED');assert.equal(verified,'local-16ch-only');assert.equal(client.store.get().snapshot.state.revision,before);assert.equal(loudness.state.enabled,false);assert.equal(loudness.state.releaseTime,40);f.sqlite.close();
+});
+test('Concurrent Cosmic edits during LEQ apply are preserved and LEQ is rolled back',async()=>{
+ const f=fixture(),pub=publication();pub.payload.loudnessEq={enabled:true,releaseTime:0};await f.call('','POST',pub);const loudness=loudnessFixture(),client=communityClient(f,loudness),change=loudness.change;
+ loudness.change=async next=>{const result=await change(next);if(next.enabled===true)client.store.patch({StepBoost:.2});return result};
+ assert.equal((await client.api.apply(pub.requestId)).code,'stale');assert.equal(client.store.get().snapshot.state.values[5],.2);assert.equal(loudness.state.enabled,false);assert.equal(loudness.state.releaseTime,40);f.sqlite.close();
 });

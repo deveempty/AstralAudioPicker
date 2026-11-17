@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Box, Flex, Text, VStack } from '@chakra-ui/react'
 import { FiCheckCircle, FiSliders } from 'react-icons/fi'
 import AstralButton from './ui/AstralButton'
-import AstralSelect from './ui/AstralSelect'
+import ChoiceGrid from './ui/ChoiceGrid'
 import StatusTag from './ui/StatusTag'
 import type { V5ActiveState, V5Preset, V5Readiness } from '../types/electron'
 import ProfileEqCard from './ProfileEqCard'
@@ -14,11 +14,12 @@ const EMPTY_READINESS: V5Readiness = { presetLibrary: false, measurementsLibrary
 const EMPTY_ACTIVE: V5ActiveState = { tuneFilename: null, headphoneEqFilename: null, headphoneName: null, headphoneSource: null, headphoneChannel: null, headphoneTarget: null, headphoneFitError: null }
 
 const prettyWeapon = (value: string) => value.replace(/Gun$/i, ' Gun').replace(/^UltraLo/i, 'Ultra Low').replace(/^Lo/i, 'Low').replace(/^Med/i, 'Medium').replace(/^Hi/i, 'High')
+const prettyProfile = (value: string) => value.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/([A-Z])([A-Z][a-z])/g,'$1 $2')
 export default function V5Control({ disabled = false }: Props) {
   const { t } = useI18n()
   const [presets, setPresets] = useState<V5Preset[]>([])
   const [readiness, setReadiness] = useState(EMPTY_READINESS)
-  const [, setActive] = useState(EMPTY_ACTIVE)
+  const [active, setActive] = useState(EMPTY_ACTIVE)
   const [game,setGame]=useState<'BO7'|'MW4'>('BO7')
   const [hrir,setHrir]=useState('KEMAR')
   const [profile, setProfile] = useState('')
@@ -38,7 +39,7 @@ export default function V5Control({ disabled = false }: Props) {
       setReadiness(nextReadiness); setPresets(nextPresets); setActive(nextActive)
       const current = nextPresets.find(item => item.filename === nextActive.tuneFilename)
       if (current) { setGame(current.game);setHrir(current.hrir);setProfile(current.profile); setWeapon(current.weaponTuning) }
-      else if(nextPresets.length)setGame(nextPresets[0].game)
+      else if(nextPresets.length) { const first=nextPresets[0]; setGame(first.game); setProfile(first.profile); setWeapon(first.weaponTuning); setHrir(first.hrir) }
     }).catch(() => { if(live) setMessage(t('profiles.applyFailed', {code:'CATALOG_REFRESH_FAILED'})) }) }
     refresh()
     window.addEventListener('astral-config-changed', refresh)
@@ -48,6 +49,19 @@ export default function V5Control({ disabled = false }: Props) {
   const profiles = useMemo(() => [...new Set(presets.filter(item=>item.game===game).map(item => item.profile))], [presets,game])
   const weapons = useMemo(() => [...new Set(presets.filter(item => item.game===game && item.profile === profile).map(item => item.weaponTuning))], [presets, profile,game])
   const selected = presets.find(item => item.game===game && item.profile === profile && item.weaponTuning === weapon && (game==='BO7'||item.hrir===hrir))
+  const hasChanges = Boolean(selected && selected.filename !== active.tuneFilename)
+  const chooseGame = (value: string) => {
+    const next = presets.find(p => p.game === value && p.profile === profile && p.weaponTuning === weapon && p.hrir === hrir) ?? presets.find(p => p.game === value)
+    setGame(value as 'BO7'|'MW4'); setProfile(next?.profile ?? ''); setWeapon(next?.weaponTuning ?? ''); setHrir(next?.hrir ?? 'KEMAR'); setMessage(''); setNeedsEq(false)
+  }
+  const chooseProfile = (value: string) => {
+    const next = presets.find(p => p.game === game && p.profile === value && p.weaponTuning === weapon && p.hrir === hrir) ?? presets.find(p => p.game === game && p.profile === value && p.hrir === hrir) ?? presets.find(p => p.game === game && p.profile === value)
+    setProfile(value); setWeapon(next?.weaponTuning ?? ''); setHrir(next?.hrir ?? hrir); setMessage(''); setNeedsEq(false)
+  }
+  const chooseWeapon = (value: string) => {
+    const next = presets.find(p => p.game===game && p.profile===profile && p.weaponTuning===value && p.hrir===hrir) ?? presets.find(p => p.game===game && p.profile===profile && p.weaponTuning===value)
+    setWeapon(value); setHrir(next?.hrir ?? hrir); setMessage(''); setNeedsEq(false)
+  }
   const ready = readiness.presetLibrary && (game==='MW4'?readiness.plugins.vstCharlie:readiness.plugins.vstV1 && readiness.plugins.vstV2)
 
   const applyPreset = async (generate = false) => {
@@ -74,11 +88,19 @@ export default function V5Control({ disabled = false }: Props) {
       <ProfileEqCard profile="aiwV5" disabled={busy || disabled} onApplied={refreshActive} showPreamp />
 
       <Box p="4" borderRadius="16px" bg="rgba(255,255,255,.025)" border="1px solid rgba(255,255,255,.075)">
-        <Text mb="3" color="purple.300" fontSize="xs" fontWeight="700" letterSpacing="wide">{t('profiles.v5Profile')}</Text>
-        <Flex gap="3" wrap="wrap"><Box flex="1" minW="140px"><Text mb="1.5" color="whiteAlpha.500" fontSize="xs">{t('profiles.game')}</Text><AstralSelect ariaLabel={t('profiles.game')} value={game} options={[...new Set(presets.map(p=>p.game))].map(value=>({value,label:value}))} onChange={value=>{setGame(value as 'BO7'|'MW4');setProfile('');setWeapon('');setHrir('KEMAR')}} disabled={busy||disabled}/></Box><Box flex="1"><Text mb="1.5" color="whiteAlpha.500" fontSize="xs">{t('profiles.profile')}</Text><AstralSelect ariaLabel={t('profiles.profile')} value={profile} options={profiles.map(value => ({ value, label: value }))} onChange={value => { setProfile(value); setWeapon('') }} disabled={busy || disabled} /></Box><Box flex="1"><Text mb="1.5" color="whiteAlpha.500" fontSize="xs">{t('profiles.weaponSound')}</Text><AstralSelect ariaLabel={t('profiles.weaponSound')} value={weapon} options={weapons.map(value => ({ value, label: prettyWeapon(value) }))} onChange={setWeapon} disabled={!profile || busy || disabled} /></Box></Flex>
-        <Box mt="3">{game==='MW4'?<AstralSelect ariaLabel="HRIR" value={hrir} options={[{value:'KEMAR',label:'HRIR KEMAR'},{value:'KU100',label:'HRIR KU100'}]} onChange={setHrir} disabled={busy||disabled}/>:null}</Box>
-        <Flex mt="3" px="3" py="2.5" justify="space-between" borderRadius="10px" bg="rgba(139,92,246,.07)"><Text color="whiteAlpha.500" fontSize="xs">{t('profiles.virtualization')}</Text><Text color="white" fontSize="xs" fontWeight="700">{game==='MW4'?'HRIR '+hrir:'Native 16ch'}</Text></Flex>
-        <Box mt="3"><AstralButton fullWidth disabled={!selected || !ready || busy || disabled} onClick={()=>void applyPreset()}>{t(busy ? 'profiles.applying' : 'profiles.applyV5')}</AstralButton></Box>
+        <div className="astral-profile-editor">
+          <ChoiceGrid compact label={t('profiles.game')} value={game} options={[...new Set(presets.map(p=>p.game))].map(value=>({value,label:value}))} onChange={chooseGame} disabled={busy||disabled}/>
+          <ChoiceGrid label={t('profiles.profile')} value={profile} options={profiles.map(value=>({value,label:prettyProfile(value)}))} onChange={chooseProfile} disabled={busy||disabled}/>
+          <div className="astral-profile-finish">
+            <ChoiceGrid compact label={t('profiles.weaponSound')} value={weapon} options={weapons.map(value=>({value,label:prettyWeapon(value)}))} onChange={chooseWeapon} disabled={!profile||busy||disabled}/>
+            {game==='MW4'?<ChoiceGrid compact label={t('profiles.virtualization')} value={hrir} options={[...new Set(presets.filter(p=>p.game===game&&p.profile===profile&&p.weaponTuning===weapon).map(p=>p.hrir))].map(value=>({value,label:'HRIR '+value}))} onChange={value=>{setHrir(value);setMessage('');setNeedsEq(false)}} disabled={busy||disabled}/>:null}
+          </div>
+          {!presets.length?<Text fontSize="sm" color="orange.300">{t('profiles.missingInstall')}</Text>:null}
+          <div className="astral-profile-apply">
+            <div><strong>{selected ? [game,prettyProfile(profile),prettyWeapon(weapon)].join(' / ') : t('profiles.selectVersion')}</strong><span>{t(hasChanges?'picker.pendingSelection':'picker.currentSelection')}</span></div>
+            <AstralButton disabled={!selected||!ready||busy||disabled||!hasChanges} onClick={()=>void applyPreset()}>{t(busy?'profiles.applying':hasChanges?'profiles.applyV5':'common.applied')}</AstralButton>
+          </div>
+        </div>
       </Box>
       {needsEq ? <AstralButton disabled={busy||disabled||!selected} onClick={()=>void applyPreset(true)}>{t('profiles.generateNow')}</AstralButton> : null}
       {busy && generation!==null ? <Text fontSize="xs" color="purple.200">{t('profiles.generatingEq', {percent:generation})}</Text> : null}

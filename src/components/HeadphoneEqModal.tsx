@@ -6,6 +6,8 @@ import type { AutoEqGenerationProgress, HeadphoneEq } from '../types/electron'
 import AstralButton from './ui/AstralButton'
 import StatusTag from './ui/StatusTag'
 import { useI18n } from '../i18n'
+import AudioSupportError from './AudioSupportError'
+import {audioErrorKey} from '../../shared/audio-errors'
 
 interface Props {
   open: boolean
@@ -61,14 +63,14 @@ export default function HeadphoneEqModal({ open, disabled, onClose, onApplied }:
     setBusy(true)
     setError('')
     setProgress({ completed: 0, total: 6, profile: 'AT V1', phase: 'generating', percent: 0 })
-    const result = await window.electronAPI.setV5HeadphoneEq(selected.relativePath)
+    try{const result = await window.electronAPI.setV5HeadphoneEq(selected.relativePath)
     if (result.success) {
       await onApplied()
       onClose()
     } else {
-      setError(t('autoeq.applyFailed', { code: result.code ?? t('common.unknown') }))
+      setError(result.code ?? 'UNKNOWN')
     }
-    setBusy(false)
+    }catch(error){setError(audioErrorKey(error))}finally{setBusy(false)}
   }
 
   return (
@@ -116,7 +118,7 @@ export default function HeadphoneEqModal({ open, disabled, onClose, onApplied }:
             <Flex mb="2" align="center" justify="space-between"><Text color="whiteAlpha.800" fontSize="xs" fontWeight="700">{t(progress.phase === 'generating' ? 'autoeq.generatingProfile' : 'autoeq.profileComplete', { profile: progress.profile })}</Text><Text color="purple.200" fontSize="xs" fontWeight="800">{progress.completed}/{progress.total}</Text></Flex>
             <Progress.Root value={progress.percent} colorPalette="purple" size="sm"><Progress.Track borderRadius="full" bg="whiteAlpha.100"><Progress.Range borderRadius="full" /></Progress.Track></Progress.Root>
           </Box> : null}
-          {error ? <Text mt="3" color="red.300" fontSize="xs">{error}</Text> : null}
+          {error ? <AudioSupportError code={error} stage="headphones"/> : null}
           <Flex mt="4" gap="3" justify="flex-end"><AstralButton variant="ghost" onClick={onClose}>{t('common.cancel')}</AstralButton><AstralButton disabled={!selected || busy || disabled} onClick={apply}>{t(busy ? 'autoeq.generating' : 'autoeq.generateApply')}</AstralButton></Flex>
         </Box>
       </Box>

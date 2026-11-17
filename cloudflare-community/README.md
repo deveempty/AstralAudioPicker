@@ -15,6 +15,12 @@ Tests use temporary control files, in-memory SQLite and a simulated R2/auth serv
 
 ## Deployment (separate authorized release step)
 
+For Loudness EQ support, integrate `community.mjs` and **0003_loudness_eq.sql** with
+`install-community.ps1`, apply the D1 migration, then deploy the Worker before
+releasing the updated Picker. No deployment is performed by the local tests.
+The catalog advertises `loudness-eq-v1`; new publications containing the setting
+are blocked on older services so they cannot silently discard it.
+
 1. In the existing `AstralAudio/cloudflare-worker` directory, use the authenticated Cloudflare account to create D1: `npx wrangler d1 create astral-audio-community`. Verify the intended account first with `npx wrangler whoami`.
 2. Run `install-community.ps1 -DatabaseId <returned-id>` from this directory. This integrates the module and adds the real D1 binding; it does not publish anything. Without `-DatabaseId`, it only integrates source.
 3. From the Worker directory, run `npx wrangler d1 migrations apply astral-audio-community --remote`, then `npx wrangler deploy`.
@@ -35,6 +41,28 @@ Until the D1 binding and migration exist, Community returns unavailable. No mock
 Electron owns network/auth and retrieves payloads in memory. It validates payload and hash before activating the existing Cosmic route and writes through `PluginControlStore`. It never opens a save/import dialog and never adds a downloaded JSON to the user's named preset library. A single `community-undo.json` preserves the immediately previous state; stale undo cannot replace later edits. Confirmation requires fresh Windows audio-service evidence matching the expected fingerprint and revision; otherwise UI states that settings are saved but audio is unconfirmed.
 
 Publishing snapshots current settings by revision or reads a selected named preset internally. No account credentials, HWIDs or device paths are included in the published payload. Favorites are held in D1. The service has no edit-in-place API: existing publications are immutable; remove and republish creates a new ID.
+
+### Windows Loudness EQ
+
+New payloads optionally include `loudnessEq: { enabled: boolean, releaseTime: 0|20|40|60|80|100 }`.
+This is Windows Loudness EQ on the existing 16-channel VB-Cable adapter, not the
+Cosmic DLL parameter named LEQ. No endpoint IDs are published. The field is
+included in the canonical payload hash and projected into D1 for the green badge.
+Saving/favoriting a Community profile preserves the author's setting; it never
+captures the recipient's setting or changes audio. New local named presets
+capture the setting at save time; publishing one uses that snapshot. Publishing
+current settings requires a successful local read. Legacy named or Community
+profiles omit the field, show no badge and leave Windows LEQ unchanged.
+
+Applying a new profile sets its release time and explicit on/off state through
+the existing 16ch writer, which restarts the endpoint and reconnects Relay.
+Readback must succeed before Cosmic parameters are committed. Failure attempts
+to restore the old LEQ settings and route and does not submit an application
+receipt. Session undo also restores LEQ and rejects later manual changes.
+Existing publications are not guessed or retroactively tagged: remove and
+republish them to include the setting. Older Pickers reject extended payloads
+at their existing hash check; release the compatible Picker before promoting
+new profiles to those clients.
 
 ## Moderation and maintenance
 

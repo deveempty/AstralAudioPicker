@@ -1,3 +1,6 @@
+import './profile-picker.css'
+import {Loudness16Provider} from './components/Loudness16Provider'
+import LoudnessQuickControl from './components/LoudnessQuickControl'
 import AudioUpgradeNotice from './components/AudioUpgradeNotice'
 import RelayStatus from './components/RelayStatus'
 import VoicemeeterControl,{vmAutoKey} from './components/VoicemeeterControl'
@@ -85,9 +88,14 @@ export default function App() {
     finally { setApplying(false) }
   }
   const selectV2 = async (key: string) => {
-    setApplying(true); const result = await window.electronAPI.setV2Sub(key)
-    if (result.success) setConfig(result.state)
-    setApplying(false)
+    if (applying) return
+    setApplying(true); setStatus(t('common.applying'))
+    try {
+      const result = await window.electronAPI.setV2Sub(key)
+      if (result.success) { setConfig(result.state); setStatus(t('common.applied')) }
+      else setStatus(t('common.failed'))
+    } catch { setStatus(t('common.failed')) }
+    finally { setApplying(false) }
   }
 
   const activeEqGroupId = config.mainConfig === 'v1' ? 'atV1' : config.mainConfig === 'aiwv2' ? 'aiwV3' : config.mainConfig === 'aiwv5' ? 'aiwV5' : null
@@ -102,7 +110,7 @@ export default function App() {
   const tunedDeviceDetail = (config.mainConfig === 'aiwv5' || config.mainConfig === 'custom') ? 'VB-Audio · 16ch' : config.mainConfig === 'none' ? t('common.off') : 'VB-Audio · 7.1'
   const displayProfile = config.mainConfig === 'custom' ? 'Cosmic' : config.mainConfig === 'aiwv5' ? 'AIW V5' : config.mainConfig === 'aiwv2' ? 'AIW V3' : config.mainConfig === 'v1' ? 'AT V1' : config.mainConfig === 'v2' ? 'AT V2' : t('common.none')
 
-  return <Box className="audio-shell" w="100vw" h="100vh" overflow="hidden" borderRadius="18px" bg="#030405" color="white" position="relative">
+  return <Loudness16Provider><Box className="audio-shell" w="100vw" h="100vh" overflow="hidden" borderRadius="18px" bg="#030405" color="white" position="relative">
     <TitleBar /><AudioAccessGate>
     <Flex className="core-picker-frame" position="absolute" inset="44px 0 0 0">
       <div className="audio-sidebar-dock" data-collapsed={sidebarCollapsed}>
@@ -144,6 +152,7 @@ export default function App() {
         <Flex data-cosmic={config.mainConfig==='custom'} className="audio-statusbar" h="104px" flexShrink="0" overflowX="auto" overflowY="hidden" align="center" px="6" gap="5" bg="#09070c" borderTop="1px solid rgba(255,255,255,.07)">
           <Flex w="4px" h="52px" borderRadius="4px" bg="#9b4dff" boxShadow="0 0 16px rgba(155,77,255,.5)" />
           <Box minW="180px"><Text color="whiteAlpha.350" fontSize="9px" fontWeight="700" letterSpacing="wide">{t('footer.activeProfile')}</Text><Text mt="1" fontSize="sm" fontWeight="800">{displayProfile}</Text><Text color="green.300" fontSize="10px">{t(config.mainConfig==='none'?'common.off':'common.active')}</Text></Box>
+          <LoudnessQuickControl disabled={applying}/>
           <Box h="42px" w="1px" bg="rgba(255,255,255,.07)" />
           {config.mainConfig==='custom'?<><CosmicAudioStatus/></>:<>
           <Box flex="1" minW="160px"><Text color="whiteAlpha.350" fontSize="9px" fontWeight="700" letterSpacing="wide">{t('footer.headphoneEq')}</Text><Text mt="1" fontSize="sm" fontWeight="700" truncate>{activeEqName}</Text><Text color="purple.200" fontSize="10px" fontWeight="650" truncate>{activeEqSource}</Text></Box>
@@ -155,5 +164,5 @@ export default function App() {
         </Flex>
       </Flex>
     </Flex>
-  </AudioAccessGate></Box>
+  </AudioAccessGate></Box></Loudness16Provider>
 }

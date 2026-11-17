@@ -59,9 +59,14 @@ export async function installAudioContent(resources:string,apo:string,localData:
  const marker=path.join(migrationRoot,'mw4-content-v1.json')
  const manifest=JSON.parse(await fs.readFile(path.join(resources,'manifest.json'),'utf8')) as ContentManifest
  if(manifest.id!=='mw4-content-v1'||!Array.isArray(manifest.files)||manifest.files.length<40)throw Error('CONTENT_INVALID_MANIFEST')
+ const roots={presets:path.join(apo,'data','AIWV5','ArtTuneKit','MW4','V1'),charlie:path.join(process.env.ProgramFiles||'C:\\Program Files','VSTPlugins','ArtTuneKit'),measurements:path.join(localData,'measurements'),targets:path.join(localData,'targets'),'reference-eq':path.join(localData,'reference-eq')}
  if(await exists(marker)){
   const saved=JSON.parse(await fs.readFile(marker,'utf8'))
-  if(saved.id===manifest.id&&saved.completed===true&&saved.archiveSha256===manifest.archiveSha256&&saved.layoutVersion===2)return
+  if(saved.id===manifest.id&&saved.completed===true&&saved.archiveSha256===manifest.archiveSha256&&saved.layoutVersion===2){
+   let verified=true
+   for(const file of manifest.files){try{const data=await fs.readFile(contentDestination(file.path,roots));if(data.length!==file.bytes||hash(data)!==file.sha256){verified=false;break}}catch{verified=false;break}}
+   if(verified)return
+  }
  }
  if(!await exists(path.join(apo,'config.txt')))throw Error('CONTENT_APO_MISSING')
  await fs.mkdir(migrationRoot,{recursive:true})
@@ -70,7 +75,6 @@ export async function installAudioContent(resources:string,apo:string,localData:
   onPhase?.('content')
   const stage=path.join(workspace,'extracted');await fs.mkdir(stage)
   await promisify(execFile)('tar.exe',['-xf',archive,'-C',stage],{windowsHide:true,timeout:120000})
-  const roots={presets:path.join(apo,'data','AIWV5','ArtTuneKit','MW4','V1'),charlie:path.join(process.env.ProgramFiles||'C:\\Program Files','VSTPlugins','ArtTuneKit'),measurements:path.join(localData,'measurements'),targets:path.join(localData,'targets'),'reference-eq':path.join(localData,'reference-eq')}
   const changed=await applyContentFiles(stage,manifest,roots,path.join(migrationRoot,'backups','mw4-'+Date.now()))
   await migrateV5Includes(apo, migrationRoot)
   await fs.writeFile(marker+'.tmp',JSON.stringify({id:manifest.id,archiveSha256:manifest.archiveSha256,layoutVersion:2,completed:true,changed,completedAt:new Date().toISOString()}))

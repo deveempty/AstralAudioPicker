@@ -39,6 +39,7 @@ $migrationDirectory = Join-Path $workerRoot 'migrations-community'
 [IO.File]::WriteAllText((Join-Path $workerSource 'community.mjs'),[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'community.mjs')),$encoding)
 [IO.File]::WriteAllText((Join-Path $migrationDirectory '0001_community.sql'),[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'migration.sql')),$encoding)
 [IO.File]::WriteAllText((Join-Path $migrationDirectory '0002_applications.sql'),[IO.File]::ReadAllText((Join-Path $PSScriptRoot '0002_applications.sql')),$encoding)
+[IO.File]::WriteAllText((Join-Path $migrationDirectory '0003_loudness_eq.sql'),[IO.File]::ReadAllText((Join-Path $PSScriptRoot '0003_loudness_eq.sql')),$encoding)
 [IO.File]::WriteAllText($entry,$source,$encoding)
 if ($DatabaseId) { [IO.File]::WriteAllText($config,$configText,$encoding) }
 Write-Output 'Community source integrated locally. No deployment or remote database changes were performed.'

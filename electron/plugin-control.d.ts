@@ -1,3 +1,4 @@
+import type { LoudnessEqSettings } from '../shared/loudness16';
 import { PluginPresetLibrary } from './plugin-presets';
 import { type PluginLibraryResult } from '../shared/plugin-control';
 import { type PluginResult } from '../shared/plugin-control';
@@ -19,7 +20,7 @@ export declare class PluginControlStore {
     applyCommunity(values: unknown, expectedRevision: number): PluginResult;
     undoCommunity(): PluginResult;
     listSaved(): PluginLibraryResult;
-    saveNamed(name: unknown, revision: unknown): PluginLibraryResult;
+    saveNamed(name: unknown, revision: unknown, loudnessEq?: LoudnessEqSettings): PluginLibraryResult;
     select(profile: unknown): PluginResult;
 }
 export declare function pluginControlDirectory(): string;

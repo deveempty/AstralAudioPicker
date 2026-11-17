@@ -4,6 +4,6 @@ const make=(name,source,target)=>{const file=path.join(root,name);fs.writeFileSy
 const legacy=make('legacy.txt','same/headphone.txt','Target V2'),bo7=make('bo7.txt','same/headphone.txt','BO7 Target V5'),mw4=make('mw4.txt','same/headphone.txt','MW4 Target V5'),other=make('other.txt','other/headphone.txt','Target V3');
 assert.equal(h.selectedHeadphone(null,[legacy,legacy]),legacy);assert.equal(h.selectedHeadphone(null,[legacy,other]),null);assert.equal(h.selectedHeadphone(mw4,[legacy,other]),mw4);
 assert.equal(h.gameEqForHeadphone(legacy,root,'BO7'),bo7);assert.equal(h.gameEqForHeadphone(legacy,root,'MW4'),mw4);assert.equal(h.gameEqForHeadphone(mw4,root,'BO7'),bo7);assert.equal(h.gameEqForHeadphone(other,root,'MW4'),null);
-const duplicate=make('duplicate.txt','same/headphone.txt','MW4 Target V5');assert.equal(h.gameEqForHeadphone(legacy,root,'MW4'),null);fs.unlinkSync(duplicate);
+const duplicate=make('duplicate.txt','same/headphone.txt','MW4 Target V5');assert.ok([duplicate,mw4].includes(h.gameEqForHeadphone(legacy,root,'MW4')));fs.appendFileSync(duplicate,'\nFilter: ON PK Fc 100 Hz Gain 3 dB Q 1');assert.equal(h.gameEqForHeadphone(legacy,root,'MW4'),null);fs.unlinkSync(duplicate);
 assert.equal(h.selectedHeadphone(root,[legacy]),legacy);
 console.log('PASS: selected headphone recovery, BO7/MW4 automatic matching, priority, ambiguity, missing EQ and directory input.');

@@ -1,3 +1,4 @@
+import {useLoudness16} from './Loudness16Provider'
 import { communityErrorKey as errorKey } from '../community-errors'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FiArrowUpRight, FiDownload, FiBookmark, FiHeadphones, FiPlus, FiSearch, FiUsers, FiX } from 'react-icons/fi'
@@ -11,6 +12,8 @@ import './community.css'
 
 export default function Community() {
   const { t } = useI18n()
+  const {state:loudness}=useLoudness16()
+  const [publishSource,setPublishSource]=useState('current')
   const [tab, setTab] = useState<'explore' | 'saved' | 'mine'>('explore')
   const [search, setSearch] = useState(''), [game, setGame] = useState(''), [page, setPage] = useState(0)
   const [profiles, setProfiles] = useState<CommunityProfile[]>([]), [more, setMore] = useState(false)
@@ -69,7 +72,7 @@ export default function Community() {
   })
   const openDetails = (profile: CommunityProfile) => {setSelected(profile);setReporting(false);setRemoveConfirm(false);setError(null);setNotice(null);detailDialog.current?.showModal()}
   const openPublish = async () => {
-    setError(null);setNotice(null);setSourceReady(false);publishId.current = crypto.randomUUID();publishDialog.current?.showModal()
+    setError(null);setNotice(null);setSourceReady(false);setPublishSource('current');publishId.current = crypto.randomUUID();publishDialog.current?.showModal()
     try {
       const [library, control] = await Promise.all([window.electronAPI.listPluginPresets(),window.electronAPI.getPluginControl()])
       if (!mounted.current) return
@@ -103,7 +106,7 @@ export default function Community() {
     {canUndo && <AstralButton size="sm" variant="secondary" disabled={busy} onClick={() => void undo()}>{t('community.undo')}</AstralButton>}
     {loading ? <p role="status" className="astral-community-session">{t('community.loading')}</p> : profiles.length ? <div className="astral-community-grid">{profiles.map(profile => <article className="astral-community-card" key={profile.id}>
       <div className="astral-community-card-top"><span className="astral-community-engine"><LuWaves aria-hidden="true"/>Cosmic</span><span className="astral-community-applications" title={t('community.applications',{count:profile.applications ?? 0})} aria-label={t('community.applications',{count:profile.applications ?? 0})}><FiDownload aria-hidden="true"/>{profile.applications ?? 0}</span></div>
-      <div className="astral-community-tags"><span>{profile.game}</span><span>{t(`community.${profile.focus}`)}</span></div>
+      <div className="astral-community-tags"><span>{profile.game}</span><span>{t(`community.${profile.focus}`)}</span>{profile.loudnessEq?.enabled?<span className="astral-community-leq" title={t('community.loudnessHelp')}>{t('community.loudnessTag')}</span>:null}</div>
       <h2>{profile.name}</h2><p className="astral-community-author">{t('community.by',{author:profile.author})}</p>
       <p className="astral-community-headphones"><FiHeadphones aria-hidden="true"/>{profile.headphones}</p>
       <div className="astral-community-card-footer"><button type="button" disabled={busy} onClick={() => openDetails(profile)}>{t('community.details')}<FiArrowUpRight aria-hidden="true"/></button><button type="button" disabled={busy} onClick={() => void apply(profile)}>{t('community.apply')}</button><button type="button" disabled={busy} className="astral-community-bookmark" aria-pressed={profile.saved} aria-label={t(profile.saved?'community.unsave':'community.save')} title={t(profile.saved?'community.unsave':'community.save')} onClick={() => void favorite(profile)}><FiBookmark aria-hidden="true"/></button></div>
@@ -112,15 +115,15 @@ export default function Community() {
     {busy && <p role="status" className="astral-community-session">{t('community.working')}</p>}
     <dialog ref={detailDialog} className="astral-community-dialog" aria-labelledby="community-detail-title">
       <button type="button" className="astral-community-close" aria-label={t('community.close')} onClick={() => detailDialog.current?.close()}><FiX/></button>
-      {selected && <><span className="astral-community-engine"><LuWaves/>Cosmic · v{selected.version}</span><h2 id="community-detail-title">{selected.name}</h2><p>{t('community.by',{author:selected.author})}</p><dl><div><dt>{t('community.game')}</dt><dd>{selected.game}</dd></div><div><dt>{t('community.headphones')}</dt><dd>{selected.headphones}</dd></div><div><dt>{t('community.approach')}</dt><dd>{t(`community.${selected.focus}`)}</dd></div></dl>{messages}<div className="astral-community-form-actions"><AstralButton variant="secondary" disabled={busy} icon={<FiBookmark/>} onClick={() => void favorite(selected)}>{t(selected.saved?'community.unsave':'community.save')}</AstralButton><AstralButton disabled={busy} onClick={() => void apply(selected)}>{t('community.apply')}</AstralButton></div><p className="astral-community-dialog-note">{t('community.applyHelp')}</p><div className="astral-community-form-actions">{canUndo && <AstralButton variant="ghost" disabled={busy} onClick={() => void undo()}>{t('community.undo')}</AstralButton>}<AstralButton variant="ghost" disabled={busy} onClick={() => setReporting(v=>!v)}>{t('community.report')}</AstralButton>{selected.owned && <AstralButton variant="ghost" disabled={busy} onClick={() => setRemoveConfirm(true)}>{t('community.remove')}</AstralButton>}</div>
+      {selected && <><span className="astral-community-engine"><LuWaves/>Cosmic · v{selected.version}</span>{selected.loudnessEq?.enabled?<div className="astral-community-tags"><span className="astral-community-leq">{t('community.loudnessTag')}</span></div>:null}<h2 id="community-detail-title">{selected.name}</h2><p>{t('community.by',{author:selected.author})}</p><dl><div><dt>{t('community.game')}</dt><dd>{selected.game}</dd></div><div><dt>{t('community.headphones')}</dt><dd>{selected.headphones}</dd></div><div><dt>{t('community.approach')}</dt><dd>{t(`community.${selected.focus}`)}</dd></div></dl>{messages}<div className="astral-community-form-actions"><AstralButton variant="secondary" disabled={busy} icon={<FiBookmark/>} onClick={() => void favorite(selected)}>{t(selected.saved?'community.unsave':'community.save')}</AstralButton><AstralButton disabled={busy} onClick={() => void apply(selected)}>{t('community.apply')}</AstralButton></div><p className="astral-community-dialog-note">{t('community.applyHelp')}{selected.loudnessEq?.enabled?' '+t('community.loudnessHelp'):''}</p><div className="astral-community-form-actions">{canUndo && <AstralButton variant="ghost" disabled={busy} onClick={() => void undo()}>{t('community.undo')}</AstralButton>}<AstralButton variant="ghost" disabled={busy} onClick={() => setReporting(v=>!v)}>{t('community.report')}</AstralButton>{selected.owned && <AstralButton variant="ghost" disabled={busy} onClick={() => setRemoveConfirm(true)}>{t('community.remove')}</AstralButton>}</div>
       {removeConfirm && <div className="astral-community-dialog-note"><p>{t('community.removeHelp')}</p><AstralButton variant="danger" disabled={busy} onClick={() => void action(()=>window.electronAPI.communityRemove(selected.id),()=>{detailDialog.current?.close();setReload(v=>v+1);setNotice('community.removed')})}>{t('community.confirmRemove')}</AstralButton><AstralButton variant="ghost" onClick={()=>setRemoveConfirm(false)}>{t('community.cancel')}</AstralButton></div>}
       {reporting && <form onSubmit={report}><label>{t('community.reportReason')}<textarea name="reason" required maxLength={600} rows={3}/></label><AstralButton type="submit" disabled={busy}>{t('community.sendReport')}</AstralButton></form>}</>}
     </dialog>
     <dialog ref={publishDialog} className="astral-community-dialog" aria-labelledby="community-publish-title" onCancel={event=>{if(busy)event.preventDefault()}}>
       <button type="button" disabled={busy} className="astral-community-close" aria-label={t('community.close')} onClick={() => publishDialog.current?.close()}><FiX/></button>
-      <h2 id="community-publish-title">{t('community.publishTitle')}</h2><p>{t('community.publishLiveHelp')}</p>{messages}
+      <h2 id="community-publish-title">{t('community.publishTitle')}</h2><p>{t('community.publishLiveHelp')}</p><p className="astral-community-dialog-note">{t('community.loudnessPublish')}</p>{(publishSource==='current'?loudness?.enabled:sources.find(s=>s.id===publishSource)?.loudnessEq?.enabled)?<div className="astral-community-tags"><span className="astral-community-leq">{t('community.loudnessTag')}</span></div>:null}{messages}
       <form onSubmit={publish} onChange={()=>{publishId.current=crypto.randomUUID()}}><fieldset disabled={busy || !sourceReady}>
-        <label>{t('community.source')}<select name="source"><option value="current">{t('community.currentSettings')}</option>{sources.map(source=><option key={source.id} value={source.id}>{source.name}</option>)}</select></label>
+        <label>{t('community.source')}<select name="source" value={publishSource} onChange={e=>setPublishSource(e.target.value)}><option value="current">{t('community.currentSettings')}</option>{sources.map(source=><option key={source.id} value={source.id}>{source.name}</option>)}</select></label>
         <label>{t('community.name')}<input name="name" required maxLength={60} placeholder={t('community.namePlaceholder')}/></label>
         <div className="astral-community-form-row"><label>{t('community.game')}<select name="game">{communityGames.map(value=><option key={value}>{value}</option>)}</select></label><label>{t('community.approach')}<select name="focus">{communityFocuses.map(value=><option key={value} value={value}>{t(`community.${value}`)}</option>)}</select></label></div>
         <label>{t('community.headphones')}<input name="headphones" required maxLength={80} placeholder={t('community.headphonesPlaceholder')}/></label>

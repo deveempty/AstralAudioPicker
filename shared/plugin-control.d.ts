@@ -1,3 +1,4 @@
+import type { LoudnessEqSettings } from './loudness16';
 export declare const pluginParameters: readonly [{
     readonly id: "LEQ";
     readonly index: 0;
@@ -601,6 +602,7 @@ export interface SavedPluginProfile {
     id: string;
     name: string;
     values: number[];
+    loudnessEq?: LoudnessEqSettings;
 }
 export type PluginLibraryResult = {
     success: true;
@@ -609,7 +611,7 @@ export type PluginLibraryResult = {
     savedId?: string;
 } | {
     success: false;
-    code: 'invalidName' | 'missingPreset' | 'invalidPreset' | 'storage' | 'busy' | 'stale';
+    code: 'invalidName' | 'missingPreset' | 'invalidPreset' | 'storage' | 'busy' | 'stale' | 'loudnessUnavailable';
 };
 export declare function validPluginValues(v: unknown): v is number[];
 export declare function builtinPluginValues(id: BuiltinPluginProfile): number[];

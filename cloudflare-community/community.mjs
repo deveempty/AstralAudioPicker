@@ -6,7 +6,9 @@ const text = (v, max) => typeof v === 'string' && v.trim().length > 0 && v.lengt
 const json = (data, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const fail = (code, status) => json({ code }, status);
 const hash = async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b => b.toString(16).padStart(2, '0')).join('');
-export const validPayload = p => !!p && p.schema === 'astral-community-cosmic' && p.version === 1 && p.stateVersion === 3 && Array.isArray(p.values) && p.values.length === 50 && p.values.every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1);
+const validLoudness = s => !!s && typeof s.enabled==='boolean' && [0,20,40,60,80,100].includes(s.releaseTime) && Object.keys(s).every(k=>k==='enabled'||k==='releaseTime');
+const payloadObject = p => ({schema:'astral-community-cosmic',version:1,stateVersion:3,values:p.values,...(p.loudnessEq?{loudnessEq:{enabled:p.loudnessEq.enabled,releaseTime:p.loudnessEq.releaseTime}}:{})});
+export const validPayload = p => !!p && p.schema === 'astral-community-cosmic' && p.version === 1 && p.stateVersion === 3 && Array.isArray(p.values) && p.values.length === 50 && (p.loudnessEq===undefined||validLoudness(p.loudnessEq)) && p.values.every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1);
 async function readBody(request) {
   if (!request.headers.get('content-type')?.includes('application/json') || !request.body) throw Error('INVALID');
   const reader = request.body.getReader(); let size = 0; const chunks = [];
@@ -22,7 +24,7 @@ async function limit(db, user, action, max) {
     count=CASE WHEN community_limits.hour=excluded.hour THEN community_limits.count+1 ELSE 1 END RETURNING count`).bind(user, action, hour).first();
   return row.count <= max;
 }
-const profile = (row, user) => ({ id: row.id, name: row.name, author: row.author, game: row.game, headphones: row.headphones, focus: row.focus, notes: row.notes, version: row.version, createdAt: row.created_at, saved: !!row.saved, owned: row.owner === user, applications: row.applications });
+const profile = (row, user) => ({ id: row.id, name: row.name, author: row.author, game: row.game, headphones: row.headphones, focus: row.focus, notes: row.notes, version: row.version, createdAt: row.created_at, saved: !!row.saved, owned: row.owner === user, applications: row.applications, ...(row.loudness_enabled!==null && row.loudness_enabled!==undefined?{loudnessEq:{enabled:row.loudness_enabled===1,releaseTime:row.loudness_release}}:{}) });
 
 export async function communityRequest(request, env) {
   try {
@@ -50,13 +52,13 @@ export async function communityRequest(request, env) {
       if(game){clauses.push('p.game=?');args.push(game);}
       if(search){clauses.push("instr(lower(p.name || ' ' || p.author || ' ' || p.headphones),lower(?))>0");args.push(search);}
       const rows=await db.prepare(`SELECT p.*,f.user_id AS saved,(SELECT count(*) FROM community_applications a WHERE a.profile_id=p.id) AS applications FROM community_profiles p LEFT JOIN community_favorites f ON f.profile_id=p.id AND f.user_id=? WHERE ${clauses.join(' AND ')} ORDER BY applications DESC,p.created_at DESC,p.id DESC LIMIT 25 OFFSET ?`).bind(...args,page*24).all();
-      return json({profiles:rows.results.slice(0,24).map(r=>profile(r,user)),more:rows.results.length>24});
+      return json({profiles:rows.results.slice(0,24).map(r=>profile(r,user)),more:rows.results.length>24,features:['loudness-eq-v1']});
     }
     if (!id && method === 'POST') {
       const body=await readBody(request);
       if (!uuid(body?.requestId) || !text(body.name,60) || !(body.notes===undefined || body.notes==='' || text(body.notes,600)) || !text(body.headphones,80) || !games.includes(body.game) || !focuses.includes(body.focus) || !validPayload(body.payload)) return fail('INVALID',400);
       const metadata={name:body.name.trim(),notes:body.notes?.trim() || '',headphones:body.headphones.trim(),game:body.game,focus:body.focus};
-      const payload=JSON.stringify({schema:'astral-community-cosmic',version:1,stateVersion:3,values:body.payload.values});
+      const payload=JSON.stringify(payloadObject(body.payload));
       const digest=await hash(payload), requestHash=await hash(JSON.stringify(metadata)+payload);
       const existing=await db.prepare('SELECT * FROM community_profiles WHERE id=?').bind(body.requestId).first();
       if(existing)return existing.owner===user && existing.request_hash===requestHash && existing.status==='published' ? json({id:existing.id}) : fail('CONFLICT',409);
@@ -66,9 +68,9 @@ export async function communityRequest(request, env) {
       // Keys include the authenticated owner and content hash: concurrent retries cannot overwrite another payload.
       const key=`community-private/${user}/${body.requestId}/${digest}.json`;
       await env.AUDIO_BUCKET.put(key,payload,{httpMetadata:{contentType:'application/json'}});
-      await db.prepare(`INSERT INTO community_profiles(id,owner,author,name,game,headphones,focus,notes,object_key,sha256,request_hash,created_at)
-        SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT count(*) FROM community_profiles WHERE owner=? AND status='published')<5
-        ON CONFLICT(id) DO NOTHING`).bind(body.requestId,user,identity.username,metadata.name,metadata.game,metadata.headphones,metadata.focus,metadata.notes,key,digest,requestHash,new Date().toISOString(),user).run();
+      await db.prepare(`INSERT INTO community_profiles(id,owner,author,name,game,headphones,focus,notes,object_key,sha256,request_hash,created_at,loudness_enabled,loudness_release)
+        SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT count(*) FROM community_profiles WHERE owner=? AND status='published')<5
+        ON CONFLICT(id) DO NOTHING`).bind(body.requestId,user,identity.username,metadata.name,metadata.game,metadata.headphones,metadata.focus,metadata.notes,key,digest,requestHash,new Date().toISOString(),body.payload.loudnessEq?Number(body.payload.loudnessEq.enabled):null,body.payload.loudnessEq?.releaseTime??null,user).run();
       const committed=await db.prepare('SELECT * FROM community_profiles WHERE id=?').bind(body.requestId).first();
       if(!committed)return fail('PROFILE_LIMIT_REACHED',409);
       if(committed.owner!==user || committed.request_hash!==requestHash)return fail('CONFLICT',409);

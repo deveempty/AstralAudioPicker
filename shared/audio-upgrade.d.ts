@@ -2,4 +2,6 @@ export type AudioUpgradePhase = 'development' | 'checking' | 'downloading' | 'do
 export interface AudioUpgradeStatus {
     phase: AudioUpgradePhase;
     code?: string;
+    operation?: string;
+    preparation?: import('./post-update').PreparationState;
 }

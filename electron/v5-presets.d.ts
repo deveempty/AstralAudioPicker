@@ -57,7 +57,7 @@ export interface AutoEqGenerationProgress {
     phase: 'generating' | 'completed';
     percent: number;
 }
-export declare function generateHeadphoneEqSet(measurementFile: string, onProgress?: (progress: AutoEqGenerationProgress) => void, v5Game?: V5Game, preserveExisting?: boolean): Promise<GeneratedHeadphoneEqSet | null>;
+export declare function generateHeadphoneEqSet(measurementFile: string, onProgress?: (progress: AutoEqGenerationProgress) => void, v5Game?: V5Game, preserveExisting?: boolean, outputRoot?: string): Promise<GeneratedHeadphoneEqSet | null>;
 export declare function getV5Readiness(): {
     presetLibrary: boolean;
     measurementsLibrary: boolean;
@@ -66,5 +66,5 @@ export declare function getV5Readiness(): {
         [k: string]: boolean;
     };
 };
-export declare function generateBothGameEqs(measurement: string, game: V5Game, onProgress?: (progress: AutoEqGenerationProgress) => void, preserveExisting?: boolean): Promise<GeneratedHeadphoneEqSet | null>;
+export declare function generateBothGameEqs(measurement: string, game: V5Game, onProgress?: (progress: AutoEqGenerationProgress) => void, preserveExisting?: boolean): Promise<GeneratedHeadphoneEqSet>;
 export {};

@@ -1,3 +1,4 @@
+import type {LoudnessEqSettings} from '../shared/loudness16'
 ﻿import { PluginPresetLibrary, pluginPresetDirectory, PresetError } from './plugin-presets'
 import { builtinPluginProfiles, builtinPluginValues, isPluginEvidence, validPluginValues, samePluginValues, type BuiltinPluginProfile, type PluginLibraryResult } from '../shared/plugin-control'
 import fs from 'node:fs'
@@ -81,7 +82,7 @@ export class PluginControlStore {
     return this.snapshot()
   }) }
   listSaved(): PluginLibraryResult {try{return {success:true,profiles:this.library.list(),directory:this.library.directory}}catch(e){return {success:false,code:e instanceof PresetError?e.code:'storage'}}}
-  saveNamed(name: unknown, revision: unknown): PluginLibraryResult {try{const saved=this.locked(()=>{const state=this.readState();if(revision!==state.revision)throw new PresetError('stale');return this.library.save(name,state.values)});return {success:true,profiles:this.library.list(),directory:this.library.directory,savedId:saved.id}}catch(e){return {success:false,code:e instanceof PresetError?e.code:e instanceof ControlError&&e.code==='busy'?'busy':'storage'}}}
+  saveNamed(name: unknown, revision: unknown, loudnessEq?:LoudnessEqSettings): PluginLibraryResult {try{const saved=this.locked(()=>{const state=this.readState();if(revision!==state.revision)throw new PresetError('stale');return this.library.save(name,state.values,false,loudnessEq)});return {success:true,profiles:this.library.list(),directory:this.library.directory,savedId:saved.id}}catch(e){return {success:false,code:e instanceof PresetError?e.code:e instanceof ControlError&&e.code==='busy'?'busy':'storage'}}}
   select(profile: unknown): PluginResult { return this.result(() => {
     if (profile !== 'standard' && profile !== 'custom') throw new ControlError('invalid')
     this.locked(() => { const current = this.readState(); if (current.profile === 'custom') this.write('custom-profile.json', current)

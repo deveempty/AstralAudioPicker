@@ -32,11 +32,13 @@ declare global {
   interface Window {
     electronAPI: import('../shared/community').CommunityAPI & import('../shared/voicemeeter').VoicemeeterAPI & {
       audioUpgradeStatus:()=>Promise<import('../shared/audio-upgrade').AudioUpgradeStatus>
+      openAudioSupport:()=>Promise<void>
       audioUpgradeRetry:()=>Promise<import('../shared/audio-upgrade').AudioUpgradeStatus>
       audioUpgradeInstall:()=>Promise<import('../shared/audio-upgrade').AudioUpgradeStatus>
       importPluginPreset: () => Promise<import('../shared/plugin-control').PluginTransferResult>
       exportPluginPreset: (id:string) => Promise<import('../shared/plugin-control').PluginTransferResult>
       runAudioDiagnostics: () => Promise<import('../shared/diagnostics').DiagnosticReport>
+      finishAudioRepair: () => Promise<import('../shared/audio-repair').AudioRepairResult>
       audioAccessStatus: () => Promise<import('../shared/audio-access').AudioAccessStatus>
       audioAccessLogin: () => Promise<import('../shared/audio-access').AudioAccessStatus>
       audioAccessRetry: () => Promise<import('../shared/audio-access').AudioAccessStatus>

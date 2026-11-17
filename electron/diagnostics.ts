@@ -1,4 +1,5 @@
 import {readApoEndpoints} from './apo-diagnostics'
+import {loudnessChecks,legacyApoCheck} from './loudness-diagnostics'
 import {relayChecks} from './relay-diagnostics'
 import type {VmState} from '../shared/voicemeeter'
 import fs from 'node:fs/promises'
@@ -31,6 +32,8 @@ export async function runDiagnostics(relayStatus?:()=>Promise<VmState>):Promise<
  add('integrity',dllValid&&settingsValid&&referenced?'ok':'warning',dllValid&&settingsValid&&referenced?'integrityOk':'integrityMissing',!dllValid||!settingsValid||!referenced?[...(!dllValid?[CUSTOM_OUTPUT_DLL]:[]),...(!settingsValid?[stateFile]:[]),...(!referenced?[MAIN_CONFIG_FILE]:[])]:[CUSTOM_OUTPUT_DLL,stateFile])
  try{const system=await windowsAudio();add('services',system.services?'ok':'error',system.services?'servicesRunning':'servicesStopped');const cables=(system.endpoints??[]).filter(n=>/cable/i.test(n));add('cable',system.endpoints===null?'unknown':cables.length?'ok':'warning',system.endpoints===null?'systemUnavailable':cables.length?'cableFound':'cableMissing',cables);if(cosmic)add('device',system.endpoints===null?'unknown':cables.some(n=>/CABLE In 16ch/i.test(n))?'ok':'warning','deviceExpected',cables)}catch{add('services','unknown','systemUnavailable');add('cable','unknown','systemUnavailable')}
  try{const endpoints=await readApoEndpoints();if(!endpoints.length)add('effects','unknown','effectsNoDevice');for(const endpoint of endpoints){const good=endpoint.modes.length>0&&!endpoint.missing&&!endpoint.disabled;checks.push({id:'effects',status:good?'ok':'warning',detail:endpoint.missing?'effectsMissing':endpoint.disabled?'effectsDisabled':endpoint.modes.length?'effectsConfigured':'effectsAbsent',paths:[endpoint.name,...endpoint.modes]})}}catch{add('effects','unknown','systemUnavailable')}
+ checks.push(...await loudnessChecks())
+ checks.push(await legacyApoCheck())
  if(relayStatus){try{checks.push(...relayChecks(await relayStatus()))}catch{add('relay','unknown','relayUnavailable')}}
  return {checkedAt:Date.now(),checks}
 }

@@ -1,3 +1,4 @@
+import { type LoudnessEqSettings } from '../shared/loudness16';
 import { type SavedPluginProfile } from '../shared/plugin-control';
 export declare class PresetError extends Error {
     readonly code: 'invalidName' | 'missingPreset' | 'invalidPreset' | 'storage' | 'busy' | 'stale';
@@ -10,5 +11,5 @@ export declare class PluginPresetLibrary {
     read(id: unknown): SavedPluginProfile;
     list(): SavedPluginProfile[];
     importFile(text: string): SavedPluginProfile;
-    save(name: unknown, values: number[], unique?: boolean): SavedPluginProfile;
+    save(name: unknown, values: number[], unique?: boolean, loudnessEq?: LoudnessEqSettings): SavedPluginProfile;
 }

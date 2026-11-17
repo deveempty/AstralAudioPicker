@@ -1,3 +1,4 @@
+import {validLoudnessEqSettings,type LoudnessEqSettings} from '../shared/loudness16'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -14,26 +15,26 @@ export class PluginPresetLibrary {
   if(!fs.existsSync(file))throw new PresetError('missingPreset')
   if(fs.statSync(file).size>16384)throw new PresetError('invalidPreset')
   let v;try{v=JSON.parse(fs.readFileSync(file,'utf8'))}catch{throw new PresetError('invalidPreset')}
-  if(!v || typeof v!=='object' || v.schema!=='astral-v3-named-preset'||v.version!==1||v.stateVersion!==3||!validName(v.name)||!validPluginValues(v.values))throw new PresetError('invalidPreset')
-  return {id,name:v.name,values:v.values}
+  if(!v || typeof v!=='object' || v.schema!=='astral-v3-named-preset'||v.version!==1||v.stateVersion!==3||!validName(v.name)||!validPluginValues(v.values)||(v.loudnessEq!==undefined&&!validLoudnessEqSettings(v.loudnessEq)))throw new PresetError('invalidPreset')
+  return {id,name:v.name,values:v.values,...(v.loudnessEq?{loudnessEq:v.loudnessEq}:{})}
  }
  list(): SavedPluginProfile[] { if(!fs.existsSync(this.directory))return [];return fs.readdirSync(this.directory).filter(f=>f.endsWith('.json')).flatMap(id=>{try{return [this.read(id)]}catch{return []}}).sort((a,b)=>a.name.localeCompare(b.name)) }
  importFile(text:string):SavedPluginProfile {
   if(Buffer.byteLength(text,'utf8')>16384)throw new PresetError('invalidPreset')
   let value;try{value=JSON.parse(text.replace(/^\uFEFF/,''))}catch{throw new PresetError('invalidPreset')}
-  if(!value||typeof value!=='object'||value.schema!=='astral-v3-named-preset'||value.version!==1||value.stateVersion!==3||!validName(value.name)||!validPluginValues(value.values))throw new PresetError('invalidPreset')
-  return this.save(value.name,value.values,true)
+  if(!value||typeof value!=='object'||value.schema!=='astral-v3-named-preset'||value.version!==1||value.stateVersion!==3||!validName(value.name)||!validPluginValues(value.values)||(value.loudnessEq!==undefined&&!validLoudnessEqSettings(value.loudnessEq)))throw new PresetError('invalidPreset')
+  return this.save(value.name,value.values,true,value.loudnessEq)
  }
- save(name: unknown, values: number[], unique = false): SavedPluginProfile {
-  if(!validName(name))throw new PresetError('invalidName');if(!validPluginValues(values))throw new PresetError('invalidPreset');name=name.trim()
+ save(name: unknown, values: number[], unique = false, loudnessEq?:LoudnessEqSettings): SavedPluginProfile {
+  if(loudnessEq!==undefined&&!validLoudnessEqSettings(loudnessEq))throw new PresetError('invalidPreset');if(!validName(name))throw new PresetError('invalidName');if(!validPluginValues(values))throw new PresetError('invalidPreset');name=name.trim()
   fs.mkdirSync(this.directory,{recursive:true});const lock=path.join(this.directory,'library.lock');let fd: number
   try { if(fs.existsSync(lock)&&Date.now()-fs.statSync(lock).mtimeMs>30000)fs.unlinkSync(lock) } catch { /* Windows holds an exclusive DLL lock while saving. */ }
   try{fd=fs.openSync(lock,'wx')}catch(e){if(['EEXIST','EACCES','EPERM'].includes((e as NodeJS.ErrnoException).code||''))throw new PresetError('busy');throw e}
   try {
    if(unique){const names=new Set(this.list().map(p=>p.name.toLowerCase()));const base=name as string;let suffix=2;while(names.has((name as string).toLowerCase())){const tail=' ('+suffix+++')';name=Array.from(base).slice(0,64-tail.length).join('')+tail}}
    const existing=this.list().find(p=>p.name.toLowerCase()===(name as string).toLowerCase());const id=existing?.id || randomUUID()+'.json';const temporary=path.join(this.directory,randomUUID()+'.tmp')
-   try { const data={schema:'astral-v3-named-preset',version:1,stateVersion:3,name,updatedAt:new Date().toISOString(),values};const out=fs.openSync(temporary,'wx');try{fs.writeFileSync(out,JSON.stringify(data));fs.fsyncSync(out)}finally{fs.closeSync(out)};fs.renameSync(temporary,path.join(this.directory,id)) }finally{if(fs.existsSync(temporary))fs.unlinkSync(temporary)}
-   return {id,name:name as string,values:[...values]}
+   try { const data={schema:'astral-v3-named-preset',version:1,stateVersion:3,name,updatedAt:new Date().toISOString(),values,...(loudnessEq?{loudnessEq}:{})};const out=fs.openSync(temporary,'wx');try{fs.writeFileSync(out,JSON.stringify(data));fs.fsyncSync(out)}finally{fs.closeSync(out)};fs.renameSync(temporary,path.join(this.directory,id)) }finally{if(fs.existsSync(temporary))fs.unlinkSync(temporary)}
+   return {id,name:name as string,values:[...values],...(loudnessEq?{loudnessEq}:{})}
   }finally{fs.closeSync(fd);try{fs.unlinkSync(lock)}catch{/* Another DLL writer may already own the lock. */}}
  }
 }

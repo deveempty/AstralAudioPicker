@@ -1,11 +1,12 @@
+import {validLoudnessEqSettings,type LoudnessEqSettings} from './loudness16'
 import { validPluginValues } from './plugin-control'
 
 export const communityGames = ['Warzone', 'Black Ops 7', 'Counter-Strike 2', 'Valorant', 'Other'] as const
 export const communityFocuses = ['focus', 'balanced', 'immersive'] as const
 export type CommunityFocus = typeof communityFocuses[number]
-export interface CommunityMetadata { name: string; game: string; headphones: string; focus: CommunityFocus; notes?: string }
+export interface CommunityMetadata { name: string; game: string; headphones: string; focus: CommunityFocus; notes?: string; loudnessEq?: LoudnessEqSettings }
 export interface CommunityProfile extends CommunityMetadata { id: string; author: string; version: number; createdAt: string; saved: boolean; owned: boolean; applications?: number }
-export interface CommunityPayload { schema: 'astral-community-cosmic'; version: 1; stateVersion: 3; values: number[] }
+export interface CommunityPayload { schema: 'astral-community-cosmic'; version: 1; stateVersion: 3; values: number[]; loudnessEq?: LoudnessEqSettings }
 export interface CommunityQuery { tab: 'explore' | 'saved' | 'mine'; search: string; game: string; page: number }
 export interface CommunityPublication extends CommunityMetadata { requestId: string; source: string; revision: number }
 export type CommunityResult<T> = { success: true; data: T } | { success: false; code: string }
@@ -24,15 +25,20 @@ export const validCommunityId = (v: unknown): v is string => typeof v === 'strin
 export function validCommunityMetadata(v: unknown): v is CommunityMetadata {
   if (!v || typeof v !== 'object') return false
   const p = v as CommunityMetadata
-  return text(p.name, 60) && (p.notes === undefined || p.notes === '' || text(p.notes, 600)) && text(p.headphones, 80) && communityGames.includes(p.game as typeof communityGames[number]) && communityFocuses.includes(p.focus)
+  return (p.loudnessEq===undefined||validLoudnessEqSettings(p.loudnessEq)) && text(p.name, 60) && (p.notes === undefined || p.notes === '' || text(p.notes, 600)) && text(p.headphones, 80) && communityGames.includes(p.game as typeof communityGames[number]) && communityFocuses.includes(p.focus)
 }
 export function validCommunityPayload(v: unknown): v is CommunityPayload {
   if (!v || typeof v !== 'object') return false
   const p = v as CommunityPayload
-  return p.schema === 'astral-community-cosmic' && p.version === 1 && p.stateVersion === 3 && validPluginValues(p.values)
+  return p.schema === 'astral-community-cosmic' && p.version === 1 && p.stateVersion === 3 && validPluginValues(p.values) && (p.loudnessEq===undefined||validLoudnessEqSettings(p.loudnessEq))
 }
 export function validCommunityProfile(v: unknown): v is CommunityProfile {
   if (!validCommunityMetadata(v)) return false
   const p = v as CommunityProfile
   return validCommunityId(p.id) && text(p.author, 80) && p.version === 1 && typeof p.createdAt === 'string' && Number.isFinite(Date.parse(p.createdAt)) && typeof p.saved === 'boolean' && typeof p.owned === 'boolean' && (p.applications === undefined || (Number.isSafeInteger(p.applications) && p.applications >= 0))
+}
+
+// Preserve the original byte representation for legacy hashes. Never include endpoint IDs.
+export function communityPayload(values:number[],loudnessEq?:LoudnessEqSettings):CommunityPayload {
+ return {schema:'astral-community-cosmic',version:1,stateVersion:3,values,...(loudnessEq?{loudnessEq:{enabled:loudnessEq.enabled,releaseTime:loudnessEq.releaseTime}}:{})}
 }

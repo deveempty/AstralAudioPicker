@@ -1,0 +1,20 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),esbuild=require('esbuild');
+const out=path.resolve('output/loudness-diagnostics-test.cjs');fs.mkdirSync(path.dirname(out),{recursive:true});
+esbuild.buildSync({entryPoints:['electron/loudness-diagnostics.ts'],bundle:true,platform:'node',format:'cjs',outfile:out});
+const {loudnessChecks}=require(out);
+(async()=>{
+ const state={deviceId:'endpoint16',enabled:true,releaseTime:40};
+ const chain={deviceId:'endpoint16',active:true,pre:true,post:true,originalPre:true,originalPost:true,disabled:false};
+ const check=(leq={},apo={})=>loudnessChecks(async()=>({...state,...leq}),async()=>({...chain,...apo}));
+ let result=await check();assert.equal(result[0].status,'ok');assert.equal(result[0].values.release,3);assert.equal(result[1].status,'ok');
+ result=await check({enabled:false});assert.equal(result[0].detail,'loudnessDisabled');assert.equal(result[0].status,'warning');
+ result=await check({}, {originalPost:false});assert.equal(result[0].detail,'loudnessUnconfirmed');assert.equal(result[1].detail,'loudnessChainIncomplete');
+ result=await check({}, {disabled:true});assert.equal(result[0].detail,'loudnessDisabled');assert.equal(result[1].detail,'loudnessEnhancementsDisabled');
+ result=await check({}, {active:false});assert.equal(result[0].status,'warning');assert.equal(result[1].detail,'loudnessEndpointDisabled');
+ result=await check({}, {deviceId:'another-endpoint'});assert(result.every(row=>row.status==='unknown'));
+ result=await loudnessChecks(async()=>{throw Error('read failed')},async()=>chain);assert.equal(result[0].status,'unknown');assert.equal(result[1].status,'ok');
+ result=await loudnessChecks(async()=>state,async()=>{throw Error('registry denied')});assert.equal(result[0].detail,'loudnessUnconfirmed');assert.equal(result[1].status,'unknown');
+ result=await check({enabled:false,releaseTime:100});assert.equal(result[0].values.release,6,'each scan reads current state');
+ console.log('PASS: enabled/disabled LEQ, release position, original APO chain, master enhancements, disabled endpoint, mismatched endpoints and independent read failures. No audio writes or restarts.');
+ if(process.argv.includes('--read-live'))console.log('Live read-only:',JSON.stringify(await loudnessChecks()));
+})().catch(error=>{console.error(error);process.exitCode=1});

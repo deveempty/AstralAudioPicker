@@ -15,7 +15,7 @@ const bootId=async()=>(await run('powershell.exe',['-NoProfile','-NonInteractive
 const root=()=>path.join(ASTRAL_APP_DATA,'upgrade-v1')
 export function preferredRelayEdition(){try{return Number(JSON.parse(syncFs.readFileSync(path.join(root(),'engine.json'),'utf8')).edition)||1}catch{return 1}}
 async function save(file:string,value:unknown){await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file+'.tmp',JSON.stringify(value));await fs.rename(file+'.tmp',file)}
-export function createAudioUpgrade(vm:ReturnType<typeof createVoicemeeter>,prepareLoudness:()=>Promise<void>=async()=>{}){
+export function createAudioUpgrade(vm:ReturnType<typeof createVoicemeeter>,prepareLoudness:()=>Promise<void>=async()=>{},relayOnly=false){
  let state:AudioUpgradeStatus={phase:app.isPackaged?'checking':'development'},pending:Promise<AudioUpgradeStatus>|undefined
  let cleaned=false
  const set=(phase:AudioUpgradeStatus['phase'],code?:string)=>(state={phase,code})
@@ -24,12 +24,14 @@ export function createAudioUpgrade(vm:ReturnType<typeof createVoicemeeter>,prepa
   if(!app.isPackaged)return set('development')
   try{
    if(!cleaned){await cleanAbandonedAudioDownloads();cleaned=true}
-   set('content')
+   if(!relayOnly){set('content')
    await installAudioContent(path.join(process.resourcesPath,'audio-update'),EQUALIZER_APO_CONFIG,ASTRAL_APP_DATA,root(),phase=>set(phase))
-   await prepareLoudness()
+   await prepareLoudness()}
    const marker=path.join(root(),'relay-complete.json')
-   try{if(JSON.parse(await fs.readFile(marker,'utf8')).completed)return set('ready')}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT'&&!(error instanceof SyntaxError))throw error}
+   let completed=false
+   try{completed=!!JSON.parse(await fs.readFile(marker,'utf8')).completed;if(completed&&!relayOnly)return set('ready')}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT'&&!(error instanceof SyntaxError))throw error}
    set('relay')
+   state.operation='relay-connect'
    const rebootMarker=path.join(root(),'awaiting-reboot.json')
    if(syncFs.existsSync(rebootMarker)){
     const pendingReboot=JSON.parse(await fs.readFile(rebootMarker,'utf8'))
@@ -45,6 +47,7 @@ export function createAudioUpgrade(vm:ReturnType<typeof createVoicemeeter>,prepa
     current=await vm.command({action:'connect'})
    }
    if(!current.strips[0]?.name||!current.bus.name)return set('needsRoute')
+   if(completed)return set('ready')
    await save(path.join(root(),'engine.json'),{edition:current.edition})
    const engine=executables.find(e=>e.edition===current.edition)?.path
    if(!engine)throw Error('RELAY_EDITION_MISSING')
@@ -61,18 +64,22 @@ export function createAudioUpgrade(vm:ReturnType<typeof createVoicemeeter>,prepa
     if(!previous.enabled)await audioStartupSet(false)
     await fs.rename(startupBefore,startupBefore+'.recovered-'+Date.now())
    }
+   state.operation='relay-startup-inspect'
    const inventory=JSON.parse((await script('Inspect',engine,journal)).stdout)
    if(inventory.conflicts.length)return set('conflict')
    // Snapshot full configuration before changing startup ownership.
    await save(path.join(root(),'relay-before.json'),current)
    const backup=path.join(root(),'voicemeeter-before-'+Date.now()+'.xml')
+   state.operation='relay-backup'
    await vm.backupSettings(backup)
    const startup=await audioStartupStatus()
    await save(startupBefore,startup)
    try{
+    state.operation='relay-startup-transfer'
     if(!startup.enabled)await audioStartupSet(true)
     await vm.command({action:'hide'})
     const after=await vm.status()
+    state.operation='relay-readback'
     const config=(s:typeof current)=>JSON.stringify({edition:s.edition,strips:s.strips.map(({name,gain,mute})=>({name,gain,mute})),bus:{name:s.bus.name,gain:s.bus.gain,mute:s.bus.mute},settings:s.settings})
     if(!after.connected||config(after)!==config(current))throw Error('RELAY_CONFIGURATION_CHANGED')
     await script('Retire',engine,journal)

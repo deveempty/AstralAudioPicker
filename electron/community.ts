@@ -1,14 +1,18 @@
+import {applyCommunityLoudness,readCommunityLoudness,sameLoudness,type CommunityLoudness} from './community-loudness'
+import type {LoudnessEqSettings} from '../shared/loudness16'
 import { createHash, randomUUID } from 'node:crypto'
-import { validCommunityId, validCommunityMetadata, validCommunityPayload, validCommunityProfile, type CommunityApplied, type CommunityProfile, type CommunityPublication, type CommunityQuery, type CommunityResult } from '../shared/community'
+import { communityPayload, validCommunityId, validCommunityMetadata, validCommunityPayload, validCommunityProfile, type CommunityApplied, type CommunityProfile, type CommunityPublication, type CommunityQuery, type CommunityResult } from '../shared/community'
 import { pluginFingerprint, type PluginResult } from '../shared/plugin-control'
 import type { PluginControlStore } from './plugin-control'
 
 export function createCommunity(options: {
   request: (route: string, init?: RequestInit) => Promise<Response>
+  loudness?:CommunityLoudness
   store: PluginControlStore
   isCosmicActive: () => boolean
   activateCosmic: () => Promise<() => Promise<void>>
 }) {
+  let undoLoudness:{revision:number;before:LoudnessEqSettings;after:LoudnessEqSettings}|undefined
   let pending = 0
   let tail: Promise<void> = Promise.resolve()
   const run = async <T>(work: () => Promise<T>): Promise<CommunityResult<T>> => {
@@ -52,13 +56,19 @@ export function createCommunity(options: {
     publish: (publication: CommunityPublication) => run(async () => {
       if (!validCommunityMetadata(publication) || !validCommunityId(publication.requestId) || typeof publication.source !== 'string') throw Error('INVALID')
       let values: number[]
+      let loudnessEq:LoudnessEqSettings|undefined
       if (publication.source === 'current') {
         const state = options.store.get(); if (!state.success) throw Error(state.code)
         if (state.snapshot.state.revision !== publication.revision) throw Error('stale')
         values = state.snapshot.state.values
-      } else values = options.store.library.read(publication.source).values
+        loudnessEq = await readCommunityLoudness(options.loudness)
+      } else { const preset=options.store.library.read(publication.source); values=preset.values; loudnessEq=preset.loudnessEq }
+      if(loudnessEq) {
+        const capabilities=await request('/community/profiles?tab=mine&page=0')
+        if(!Array.isArray(capabilities.features)||!capabilities.features.includes('loudness-eq-v1'))throw Error('COMMUNITY_LOUDNESS_SERVICE_REQUIRED')
+      }
       const { name, game, headphones, focus, notes, requestId } = publication
-      const data = await request('/community/profiles', { method:'POST', body:JSON.stringify({name,game,headphones,focus,notes,requestId,payload:{schema:'astral-community-cosmic',version:1,stateVersion:3,values}}) })
+      const data = await request('/community/profiles', { method:'POST', body:JSON.stringify({name,game,headphones,focus,notes,requestId,payload:communityPayload(values,loudnessEq)}) })
       if (!validCommunityId(data.id)) throw Error('INVALID_PROFILE')
       return { id:data.id as string }
     }),
@@ -67,12 +77,21 @@ export function createCommunity(options: {
       const previous = options.store.get(); if (!previous.success) throw Error(previous.code)
       const data = await request(route)
       if (data.id !== id || data.version !== 1 || !validCommunityPayload(data.payload)) throw Error('INVALID_PROFILE')
-      const payload = JSON.stringify({schema:'astral-community-cosmic',version:1,stateVersion:3,values:data.payload.values})
+      const payload = JSON.stringify(communityPayload(data.payload.values,data.payload.loudnessEq))
       if (createHash('sha256').update(payload).digest('hex') !== data.sha256) throw Error('INVALID_PROFILE')
       const rollback = await options.activateCosmic()
       if (!options.isCosmicActive()) {await rollback();throw Error('COSMIC_NOT_ACTIVE')}
-      const result = options.store.applyCommunity(data.payload.values, previous.snapshot.state.revision)
-      if (!result.success) { await rollback(); throw Error(result.code) }
+      let loudnessChange:Awaited<ReturnType<typeof applyCommunityLoudness>>|undefined
+      let result:PluginResult
+      try {
+        if(data.payload.loudnessEq)loudnessChange=await applyCommunityLoudness(options.loudness,data.payload.loudnessEq)
+        result=options.store.applyCommunity(data.payload.values,previous.snapshot.state.revision)
+        if(!result.success)throw Error(result.code)
+      } catch(error) {
+        try {await loudnessChange?.restore()} finally {await rollback()}
+        throw error
+      }
+      undoLoudness=loudnessChange&&result.success?{revision:result.snapshot.state.revision,before:loudnessChange.before,after:data.payload.loudnessEq}:undefined
       const applied = await confirmed(result)
       // Analytics must never turn a successful settings write into an application error.
       try {
@@ -83,7 +102,16 @@ export function createCommunity(options: {
     }),
     undo: () => run(async () => {
       if (!options.isCosmicActive()) throw Error('COSMIC_NOT_ACTIVE')
-      return confirmed(options.store.undoCommunity())
+      let change:Awaited<ReturnType<typeof applyCommunityLoudness>>|undefined
+      if(undoLoudness) {
+        const current=options.store.get()
+        if(!current.success||current.snapshot.state.revision!==undoLoudness.revision||!sameLoudness(await readCommunityLoudness(options.loudness),undoLoudness.after))throw Error('stale')
+        change=await applyCommunityLoudness(options.loudness,undoLoudness.before)
+      }
+      const result=options.store.undoCommunity()
+      if(!result.success){await change?.restore();throw Error(result.code)}
+      undoLoudness=undefined
+      return confirmed(result)
     }),
     favorite: (id: string, saved: boolean) => run(async () => {
       if (typeof saved !== 'boolean') throw Error('INVALID')

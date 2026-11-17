@@ -1,6 +1,10 @@
 import type { TranslationKey } from './i18n'
 
 export function communityErrorKey(code: string): TranslationKey {
+  if(code==='COMMUNITY_LOUDNESS_READ_FAILED')return 'community.errorLoudnessRead'
+  if(code==='COMMUNITY_LOUDNESS_APPLY_FAILED')return 'community.errorLoudnessApply'
+  if(code==='COMMUNITY_LOUDNESS_RESTORE_FAILED')return 'community.errorLoudnessRestore'
+  if(code==='COMMUNITY_LOUDNESS_SERVICE_REQUIRED')return 'community.errorLoudnessService'
   if (code === 'PROFILE_LIMIT_REACHED') return 'community.errorProfileLimit'
   if (['COMMUNITY_LOGIN_REQUIRED','LOGIN_REQUIRED','ACCESS_DENIED','SESSION_EXPIRED','ENOENT'].includes(code)) return 'community.errorLogin'
   if (['RATE_LIMITED','DISCORD_HTTP_429'].includes(code)) return 'community.errorRateLimited'

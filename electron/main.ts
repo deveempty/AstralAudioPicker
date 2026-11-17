@@ -1,11 +1,14 @@
+import {readApoChain,verifyApoChain} from './apo-chain'
 import {switchVerifiedCable} from './cable-switch'
 import {matchingGameEq,initialGameEq,selectedHeadphone,gameEqForHeadphone,headphoneSource} from './v5-game-eq'
 import {parseV5Preset} from '../shared/v5-catalog'
 import {updateEndpointIcons} from './endpoint-icons'
 import {createAudioUpgrade,preferredRelayEdition} from './audio-upgrade'
+import {createAudioPreparation} from './audio-preparation'
+import {createAudioRepair} from './audio-repair'
+import {createApoRepair} from './apo-repair'
 import {writeLoudness} from './loudness-write'
 import {createLoudness16} from './loudness16'
-import {ensureLoudness16Enabled} from './loudness-migration'
 import type {Loudness16Change} from '../shared/loudness16'
 import {audioStartupStatus,audioStartupSet} from './audio-startup'
 import {audioTrayLabels} from '../shared/audio-tray-labels'
@@ -33,17 +36,24 @@ const registerPickerHandler = ipcMain.handle.bind(ipcMain)
 function handlePicker(channel: string, listener: Parameters<typeof ipcMain.handle>[1]) {
  registerPickerHandler(channel,(event,...args)=>{
   if(pickerUpdateBlocked() && !/^(audio-access-|window-)/.test(channel)) throw Error('UPDATE_REQUIRED')
+  if((audioPreparation?.busy()||audioRepair?.busy()) && /^(set-|apply-|patch-|select-|load-plugin|builtin-plugin|import-plugin|delete-|restart-|disable-|audio-startup-set|voicemeeter-command|community-apply|community-undo|audio-upgrade-)/.test(channel))throw Error('AUDIO_PREPARATION_BUSY')
   return listener(event,...args)
  })
 }
 const voicemeeter=createVoicemeeter(preferredRelayEdition)
-const audioUpgrade=createAudioUpgrade(voicemeeter,async()=>{
- await ensureLoudness16Enabled(path.join(process.env.ProgramData||'C:\\ProgramData','AstralAudio','migrations'),()=>loudness16.read(),()=>loudness16.change({enabled:true}))
- win?.webContents.send('loudness16-changed')
-})
-ipcMain.handle('audio-upgrade-status',()=>audioUpgrade.status())
-handlePicker('audio-upgrade-retry',()=>audioUpgrade.prepare())
-handlePicker('audio-upgrade-install',()=>audioUpgrade.install())
+const audioUpgrade=createAudioUpgrade(voicemeeter,undefined,true)
+let audioPreparation:ReturnType<typeof createAudioPreparation>|undefined
+let audioRepair:ReturnType<typeof createAudioRepair>|undefined
+let legacyMigrationReady=false,preparationStarted=false
+let relayInstallPending=false
+function beginAudioPreparation(force=false){
+ if(audioRepair?.busy()||!app.isPackaged||audioLocalTest||!legacyMigrationReady||pickerUpdateBlocked()||audioAccess?.status().phase!=='ready')return
+ if(!preparationStarted||force){preparationStarted=true;void audioPreparation?.start(force).then(()=>win?.webContents.send('loudness16-changed'))}
+}
+ipcMain.handle('audio-upgrade-status',()=>{beginAudioPreparation();if(relayInstallPending)return audioUpgrade.status();return app.isPackaged&&!audioLocalTest?audioPreparation?.status()??{phase:'checking'}:{phase:'development'}})
+ipcMain.handle('open-audio-support',()=>shell.openExternal('https://discord.com/channels/1276089413507616810'))
+handlePicker('audio-upgrade-retry',()=>{relayInstallPending=false;beginAudioPreparation(true);return audioPreparation?.status()??{phase:'checking'}})
+handlePicker('audio-upgrade-install',async()=>{if(audioPreparation?.busy())throw Error('AUDIO_PREPARATION_BUSY');relayInstallPending=true;const result=await audioUpgrade.install();if(result.phase==='ready'){relayInstallPending=false;beginAudioPreparation(true)}return result})
 handlePicker('voicemeeter-status',()=>voicemeeter.status())
 handlePicker('voicemeeter-command',(_event,command:VmCommand)=>voicemeeter.command(command))
 app.on('before-quit',()=>voicemeeter.dispose())
@@ -102,6 +112,17 @@ app.whenReady().then(async () => {
   }catch{tray=null}
   if(process.argv.includes('--audio-background'))void voicemeeter.command({action:'connect'}).catch(()=>showAudioWindow())
   audioAccess=createAudioAccess(CONFIG_FILE)
+  audioPreparation=createAudioPreparation({version:app.getVersion(),userData:app.getPath('userData'),resources:process.resourcesPath,previousInstall:fs.existsSync(path.join(app.getPath('userData'),'picker-state.json'))||fs.existsSync(path.join(process.env.PROGRAMDATA||app.getPath('userData'),'AstralAudio','migration-state.json')),vm:voicemeeter,relay:audioUpgrade,loudness:loudness16,
+   selected:()=>{
+    const anchor=currentHeadphoneAnchor()
+    const files=[...new Set([anchor,...([['v1',EQ_V2_FOLDER],['aiwv2',EQ_V3_FOLDER]] as const).map(([profile,folder])=>{const name=getCurrentFilter(profile);return name?path.join(folder,name+'.txt'):null})].filter((file):file is string=>!!file))]
+    return {files,v5Anchor:anchor,v5Game:parseV5Preset(path.basename(readV5Include('tune')??''))?.game??'BO7',hasSelection:files.some(file=>path.basename(file).toLowerCase()!=='flat.txt')}
+   },applyV5:file=>updateV5Include('headphone',file),verifySelection:(source,game)=>{
+    if(!source)return true
+    const file=readV5Include('headphone');if(!file)return false
+    const absolute=path.resolve(CONFIG_PATH,file)
+    return headphoneSource(absolute)===source&&matchingGameEq(absolute,game)===absolute
+   }})
   createWindow()
   if(!tray)win?.show()
   if (win) attachUpdaterWindow(win)
@@ -115,7 +136,8 @@ app.whenReady().then(async () => {
     }
     publishMigrationStatus({ phase: 'idle' })
     if (win) initializeAutoUpdater(win)
-    void audioUpgrade.prepare()
+    legacyMigrationReady=true
+    beginAudioPreparation()
   })
 })
 app.on('window-all-closed', () => app.quit())
@@ -482,6 +504,17 @@ const loudness16=createLoudness16(
 )
 handlePicker('get-loudness16',()=>loudness16.read())
 handlePicker('set-loudness16',(_event,change:Loudness16Change)=>loudness16.change(change))
+handlePicker('finish-audio-repair',async()=>{
+ if(audioPreparation?.busy()||relayInstallPending)return {ok:false,code:'AUDIO_PREPARATION_BUSY'}
+ audioRepair??=createAudioRepair(loudness16,async entry=>{
+  const directory=path.join(process.env.LOCALAPPDATA||app.getPath('userData'),'AstralAudio','repair')
+  await fs.promises.mkdir(directory,{recursive:true})
+  await fs.promises.appendFile(path.join(directory,'history.jsonl'),JSON.stringify(entry)+'\n')
+ },createApoRepair(operation=>voicemeeter.withEndpointRestart(operation)))
+ const result=await audioRepair.finish()
+ win?.webContents.send('loudness16-changed')
+ return result
+})
 
 handlePicker('get-loudness-settings', (_event, deviceId: string) => getLoudnessSettings(deviceId))
 handlePicker('set-loudness-enabled', (_event, deviceId: string, enabled: boolean) => setLoudnessEnabled(deviceId, enabled))
@@ -533,8 +566,9 @@ Write-Output "Disabled $changed Voicemeeter endpoints."
 `))
 
 handlePicker('open-eapo-device-selector', async () => {
-  const selectorPath = 'C:\\Program Files\\EqualizerAPO\\DeviceSelector.exe'
-  if (!fs.existsSync(selectorPath)) return false
+  if(audioPreparation?.busy()||audioRepair?.busy())return false
+  const selectorPath = ['DeviceSelector.exe','Configurator.exe'].map(name=>path.resolve(CONFIG_PATH,'..',name)).find(file=>fs.existsSync(file))
+  if (!selectorPath) return false
   return (await shell.openPath(selectorPath)) === ''
 })
 
@@ -1172,6 +1206,10 @@ handlePicker('delete-saved-headphone-eq', (_event, files: Partial<Record<'atV1' 
 const pluginControl = new PluginControlStore(pluginControlDirectory())
 const community = createCommunity({
   store:pluginControl,
+  loudness:{...loudness16,changed:()=>win?.webContents.send('loudness16-changed'),verifyActive:async(deviceId)=>{
+    const chain=await readApoChain('v5');verifyApoChain(chain)
+    if(chain.deviceId.toLowerCase()!==deviceId.toLowerCase()||!chain.active||chain.disabled)throw Error('APO_CHAIN_UNCONFIRMED')
+  }},
   request:(route,init)=>audioAccess.communityRequest(route,init),
   isCosmicActive:()=>readConfigState().mainConfig==='custom',
   activateCosmic:async()=>{
@@ -1194,7 +1232,10 @@ const pluginTransfer=createPluginTransfer(pluginControl.library,()=>win)
 handlePicker('import-plugin-preset',()=>pluginTransfer.import())
 handlePicker('export-plugin-preset',(_event,id:unknown)=>pluginTransfer.export(id))
 handlePicker('list-plugin-presets', () => pluginControl.listSaved())
-handlePicker('save-plugin-preset', (_event, name: unknown, revision: unknown) => pluginControl.saveNamed(name, revision))
+handlePicker('save-plugin-preset', async (_event, name: unknown, revision: unknown) => {
+ try {const state=await loudness16.read();return pluginControl.saveNamed(name,revision,{enabled:state.enabled,releaseTime:state.releaseTime})}
+ catch {return {success:false,code:'loudnessUnavailable'}}
+})
 handlePicker('load-plugin-preset', (_event, id: unknown) => pluginControl.loadSaved(id))
 handlePicker('builtin-plugin-preset', (_event, id: unknown) => pluginControl.builtin(id))
 handlePicker('get-plugin-control', () => pluginControl.get())

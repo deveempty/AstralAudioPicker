@@ -23,8 +23,8 @@ $devices=@(Get-ChildItem 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\M
  $props=Get-ItemProperty -LiteralPath (Join-Path $_.PSPath 'Properties') -ErrorAction SilentlyContinue
  $props -and $props.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' -eq 'CABLE In 16ch' -and $props.'{b3f8fa53-0004-438e-9003-51a46e139bfc},6' -eq 'VB-Audio Virtual Cable'
 })
-$active=@($devices | Where-Object {$_.GetValue('DeviceState') -eq 1})
-if($active.Count -eq 1){$devices=$active}else{$devices=@($devices | Where-Object {$_.GetValue('DeviceState') -in @(1,2)})}
+$active=@($devices | Where-Object {($_.GetValue('DeviceState') -band 15) -eq 1 -and ($_.GetValue('DeviceState') -band 0x10000000) -eq 0})
+if($active.Count -eq 1){$devices=$active}else{$devices=@($devices | Where-Object {($_.GetValue('DeviceState') -band 15) -in @(1,2)})}
 if($devices.Count -ne 1){throw 'LOUDNESS_ENDPOINT_AMBIGUOUS_OR_MISSING'}
 $fx=Get-Item -LiteralPath (Join-Path $devices[0].PSPath 'FxProperties')
 $values=@{}

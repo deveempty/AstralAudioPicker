@@ -19,7 +19,7 @@ export function matchingGameEq(currentFile: string, game: V5Game): string | null
     const candidate = metadata(file)
     return candidate.target === target && candidate.source === current.source ? [file] : []
   })
-  return matches.length === 1 ? matches[0] : null
+  return equivalentMatch(matches)
 }
 
 // Allow the first explicit headphone selection before a tune has been chosen.
@@ -41,5 +41,13 @@ export function selectedHeadphone(current:string|null, legacy:string[]):string|n
 export function gameEqForHeadphone(anchor:string,folder:string,game:V5Game):string|null {
   const source=headphoneSource(anchor);if(!source || !fs.existsSync(folder))return null
   const matches=fs.readdirSync(folder,{withFileTypes:true}).filter(e=>e.isFile()&&e.name.toLowerCase().endsWith('.txt')).map(e=>path.join(folder,e.name)).filter(file=>headphoneSource(file)===source && fs.readFileSync(file,'utf8').match(/^# Target:\s*(.+)$/mi)?.[1].trim()===game+' Target V5')
-  return matches.length===1?matches[0]:null
+  if(matches.includes(anchor))return anchor
+  return equivalentMatch(matches)
+}
+function equivalentMatch(files:string[]):string|null {
+ if(files.length===1)return files[0]
+ // Renamed legacy files can coexist after migration. Identical bytes are safe;
+ // different EQs for the same source must still be treated as ambiguous.
+ if(files.length>1&&files.every(file=>fs.readFileSync(file).equals(fs.readFileSync(files[0]))))return [...files].sort()[0]
+ return null
 }

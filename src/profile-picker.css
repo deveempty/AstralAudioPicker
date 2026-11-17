@@ -1,0 +1,45 @@
+.astral-choice-field {min-width:0;border:0;padding:0;margin:0}
+.astral-choice-field legend {margin-bottom:10px;color:#a1a4ae;font-size:12px;font-weight:600}
+.astral-choice-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px}
+.astral-choice {display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px;padding:14px;text-align:left;background:#0b0c10;border:1px solid #292b32;border-radius:9px;cursor:pointer}
+.astral-choice strong {display:block;font-size:13px;font-weight:650;overflow-wrap:anywhere}
+.astral-choice small {display:block;color:#a1a4ae;font-size:11px;margin-top:5px}
+.astral-choice-check {flex-shrink:0;color:#b7a0ff;visibility:hidden}
+.astral-choice[aria-pressed=true] .astral-choice-check {visibility:visible}
+.astral-choice-compact .astral-choice-grid {display:flex;flex-wrap:wrap}
+.astral-choice-compact .astral-choice {min-height:38px;padding:9px 13px;gap:10px}
+.astral-choice-compact .astral-choice-check {width:13px}
+.astral-choice:hover:not(:disabled),.astral-preset-card:hover:not(:disabled) {border-color:#6d6090;background-color:#111319}
+.astral-choice[aria-pressed=true],.astral-preset-card[aria-pressed=true] {border-color:transparent;background:linear-gradient(#15121e,#101219) padding-box,linear-gradient(120deg,#a78bfa,#8b5cf6 55%,#5aa7ff) border-box}
+.astral-choice:disabled,.astral-preset-card:disabled {opacity:.5;cursor:wait}
+.astral-profile-editor {display:grid;gap:22px}
+.astral-profile-finish {display:flex;flex-wrap:wrap;gap:24px}
+.astral-profile-finish > :first-child {flex:1}
+.astral-profile-apply {display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:16px;border-top:1px solid #24262d}
+.astral-profile-apply strong {display:block;font-size:12px;font-weight:600}
+.astral-profile-apply span {display:block;font-size:11px;color:#a1a4ae;margin-top:5px}
+.astral-profile-apply > button {flex-shrink:0}
+.astral-loudness-quick {min-width:128px;padding:0 14px;border-inline:1px solid #24262d}
+.astral-loudness-title,.astral-loudness-state {display:flex;align-items:center;justify-content:space-between;gap:10px}
+.astral-loudness-title {font-size:11px}
+.astral-loudness-title button {padding:3px;color:#a1a4ae;cursor:pointer}
+.astral-loudness-state {margin-top:7px;font-size:10px;color:#a1a4ae}
+.astral-loudness-state > button {color:#d6b886;cursor:pointer}
+.astral-quick-switch {display:flex;align-items:center;gap:7px;cursor:pointer;position:relative}
+.astral-quick-switch input {position:absolute;width:30px;height:18px;opacity:0;cursor:pointer}
+.astral-switch-track {display:block;width:30px;height:18px;border-radius:20px;background:#353741;border:1px solid #5a5d69}
+.astral-switch-track::after {content:'';display:block;width:12px;height:12px;border-radius:50%;background:#d4d5dc;margin:2px;transition:transform 140ms}
+.astral-quick-switch input:checked + .astral-switch-track {background:#7753cb;border-color:#a78bfa}
+.astral-quick-switch input:checked + .astral-switch-track::after {transform:translateX(12px);background:white}
+.astral-quick-switch input:checked ~ strong {color:#c4b5fd}
+.astral-quick-switch input:focus-visible + .astral-switch-track {outline:2px solid #c4b5fd;outline-offset:3px}
+.astral-quick-switch input:disabled ~ * {opacity:.5;cursor:wait}
+.astral-loudness-error {display:block;color:#fca5a5;font-size:10px;max-width:150px;white-space:normal;text-align:left;margin-top:5px}
+.astral-loudness-pending {display:block;color:#c4b5fd;font-size:10px;margin-top:5px}
+.astral-loudness-dialog {position:fixed;inset:0;margin:auto;width:min(440px,calc(100vw - 32px));padding:24px;background:#0c0d11;color:#f2f3f5;border:1px solid #35313f;border-radius:12px;white-space:normal}
+.astral-loudness-dialog::backdrop {background:rgb(0 0 0 / .7)}
+.astral-loudness-dialog header {display:flex;align-items:center;justify-content:space-between;gap:16px}
+.astral-loudness-dialog header button {padding:6px;cursor:pointer}
+.astral-loudness-dialog p {margin:16px 0;font-size:13px;line-height:1.6;color:#a1a4ae}
+.astral-loudness-dialog .astral-loudness-error {max-width:none;color:#fca5a5}
+@media(max-width:600px) {.astral-profile-apply{align-items:stretch;flex-direction:column}}

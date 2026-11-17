@@ -1,3 +1,4 @@
+import type {LoudnessEqSettings} from './loudness16'
 // Versioned contract for Lirio EQ v3 REVAMP 07. Indices match stateVersion 3.
 export const pluginParameters = [
   {
@@ -619,8 +620,8 @@ export function physicalValue(index: number, normalized: number): number { const
 export interface PluginEvidence { hash: number; blocks: number; state: 0 | 1 | 2; input: number; output: number; delta: number[] }
 export const builtinPluginProfiles = ['default', 'natural', 'focus', 'quiet', 'clean', 'discreet', 'soft'] as const
 export type BuiltinPluginProfile = typeof builtinPluginProfiles[number]
-export interface SavedPluginProfile { id: string; name: string; values: number[] }
-export type PluginLibraryResult = { success: true; profiles: SavedPluginProfile[]; directory: string; savedId?: string } | { success: false; code: 'invalidName' | 'missingPreset' | 'invalidPreset' | 'storage' | 'busy' | 'stale' }
+export interface SavedPluginProfile { id: string; name: string; values: number[]; loudnessEq?: LoudnessEqSettings }
+export type PluginLibraryResult = { success: true; profiles: SavedPluginProfile[]; directory: string; savedId?: string } | { success: false; code: 'invalidName' | 'missingPreset' | 'invalidPreset' | 'storage' | 'busy' | 'stale' | 'loudnessUnavailable' }
 export function validPluginValues(v: unknown): v is number[] { return Array.isArray(v) && v.length === 50 && v.every(x => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1) }
 export function builtinPluginValues(id: BuiltinPluginProfile): number[] {
  const values = pluginParameters.map(p => Math.fround(p.initial))

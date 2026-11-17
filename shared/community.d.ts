@@ -1,3 +1,4 @@
+import { type LoudnessEqSettings } from './loudness16';
 export declare const communityGames: readonly ["Warzone", "Black Ops 7", "Counter-Strike 2", "Valorant", "Other"];
 export declare const communityFocuses: readonly ["focus", "balanced", "immersive"];
 export type CommunityFocus = typeof communityFocuses[number];
@@ -7,6 +8,7 @@ export interface CommunityMetadata {
     headphones: string;
     focus: CommunityFocus;
     notes?: string;
+    loudnessEq?: LoudnessEqSettings;
 }
 export interface CommunityProfile extends CommunityMetadata {
     id: string;
@@ -22,6 +24,7 @@ export interface CommunityPayload {
     version: 1;
     stateVersion: 3;
     values: number[];
+    loudnessEq?: LoudnessEqSettings;
 }
 export interface CommunityQuery {
     tab: 'explore' | 'saved' | 'mine';
@@ -70,3 +73,4 @@ export declare const validCommunityId: (v: unknown) => v is string;
 export declare function validCommunityMetadata(v: unknown): v is CommunityMetadata;
 export declare function validCommunityPayload(v: unknown): v is CommunityPayload;
 export declare function validCommunityProfile(v: unknown): v is CommunityProfile;
+export declare function communityPayload(values: number[], loudnessEq?: LoudnessEqSettings): CommunityPayload;

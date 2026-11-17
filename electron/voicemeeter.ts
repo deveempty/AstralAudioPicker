@@ -7,6 +7,10 @@ import type {VmCommand,VmDevice,VmState} from '../shared/voicemeeter'
 import {vmDrivers,vmSettingValues,type VmSetting,type VmSettings} from '../shared/voicemeeter'
 
 const run=promisify(execFile),delay=(ms:number)=>new Promise(r=>setTimeout(r,ms))
+export function relayRestartSettled(before:VmState,after:VmState){
+ const gain=(a:number,b:number)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<0.01
+ return after.connected&&after.edition===before.edition&&after.bus.name===before.bus.name&&gain(after.bus.gain,before.bus.gain)&&after.bus.mute===before.bus.mute&&after.strips.length===before.strips.length&&after.strips.every((s,i)=>s.name===before.strips[i].name&&gain(s.gain,before.strips[i].gain)&&s.mute===before.strips[i].mute)&&Object.entries(before.settings??{}).every(([key,value])=>after.settings?.[key as VmSetting]===value)
+}
 const blank=():VmState=>({installed:false,connected:false,edition:0,inputs:[],outputs:[],strips:[],bus:{name:'',gain:0,mute:false,peakDb:-120}})
 export function createVoicemeeter(preferredEdition:()=>number=()=>1){
  let folder='',api:ReturnType<typeof bind>|undefined,logged=false,initializing:Promise<void>|undefined,busy=false
@@ -142,11 +146,12 @@ export function createVoicemeeter(preferredEdition:()=>number=()=>1){
     if(before.connected){
      try{
       check(api!.set('Command.Restart',1))
-      let confirmed=false
+      let confirmed=false,stable=0
       for(let i=0;i<30;i++){
        await delay(200)
        const after=await status()
-       if(after.connected&&after.bus.name===before.bus.name&&after.strips.every((s,index)=>s.name===before.strips[index]?.name)){confirmed=true;break}
+       stable=relayRestartSettled(before,after)?stable+1:0
+       if(stable>=2){confirmed=true;break}
       }
       if(!confirmed)throw Error('VM_ROUTE_UNCONFIRMED')
      }catch(error){console.error('Relay reconnect after endpoint restart:',error);throw Error('LOUDNESS_RELAY_RESTART_FAILED')}
