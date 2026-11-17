@@ -1,6 +1,9 @@
 // Equalizer APO's published endpoint registration contract (installation version 2).
 // Original effect IDs are recovered from each endpoint, never from another PC.
 export const apoIds={pre:'{EACD2258-FCAC-4FF4-B36D-419E924A6D79}',post:'{EC1CC9CE-FAED-4822-828A-82A81A6F018F}'} as const
+// Astral's SetLoudness.ps1 provisions these Windows effects. They are not
+// recovered originals: retain the real uninstall backup when provisioning them.
+export const windowsLoudnessIds={pre:'{62dc1a93-ae24-464c-a43e-452f824c4250}',post:'{637c490d-eee3-4c0a-973f-371958802da2}'} as const
 export const fxSlot=(slot:number)=>`{d04e05a6-594b-4fb6-a80d-01af5eed7d1d},${slot}`
 export const enhancementFlag='{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5'
 export type RegistryValue={kind:string;value:string|number|string[]|number[]}
@@ -9,7 +12,7 @@ export type CableKind='legacy'|'v5'
 export const cableNames:Record<CableKind,string>={legacy:'Cable Input 7.1',v5:'CABLE In 16ch'}
 export const endpointActive=(state:number)=>(state&15)===1&&(state&0x10000000)===0
 export interface ApoEndpointState {id:string;name:string;adapter:string;state:number;fx:RegistryValues|null;child:RegistryValues|null}
-export interface ApoInventory {endpoints:ApoEndpointState[];dlls:Record<string,string>;registered:boolean}
+export interface ApoInventory {endpoints:ApoEndpointState[];dlls:Record<string,string>;registered:boolean;windowsLoudnessAvailable?:boolean}
 export interface ApoPatch {id:string;name:string;state:number;beforeFx:RegistryValues;beforeChild:RegistryValues|null;fx:Record<string,RegistryValue|null>;child:Record<string,RegistryValue|null>}
 const str=(value:string):RegistryValue=>({kind:'String',value})
 const own=(value:unknown)=>typeof value==='string'&&Object.values(apoIds).some(id=>id.toLowerCase()===value.toLowerCase())
@@ -17,6 +20,21 @@ const absent=(value:unknown)=>value===undefined||value===''||value==='!VALUE'||v
 const scalar=(values:RegistryValues|null,key:string)=>values?.[key]?.kind==='String'?values[key].value:undefined
 const same=(a:RegistryValue|undefined,b:RegistryValue|null)=>b===null?a===undefined:!!a&&a.kind===b.kind&&JSON.stringify(a.value)===JSON.stringify(b.value)
 function fail(code:string,endpoint?:ApoEndpointState):never{throw new Error(code,{cause:{endpoint:endpoint?.name,deviceId:endpoint?.id}})}
+export function provisionedLoudnessEffects(inventory:ApoInventory,e:ApoEndpointState){
+ if(!inventory.registered||inventory.windowsLoudnessAvailable!==true||e.adapter!=='VB-Audio Virtual Cable'||!Object.values(cableNames).some(n=>n.toLowerCase()===e.name.toLowerCase()))return undefined
+ if(scalar(e.child,'Version')!=='2')return undefined
+ // Only the explicit, empty version-2 backup is recoverable by this policy.
+ // Missing/corrupt backups, partial originals and other processors still stop.
+ if(![1,2,5,6,7].every(slot=>scalar(e.child,fxSlot(slot))==='!VALUE'))return undefined
+ if(![5,6,7,13,14,15].every(slot=>!e.fx?.[fxSlot(slot)]))return undefined
+ for(const [slot,side,childKey] of [[1,'pre','PreMixChild'],[2,'post','PostMixChild']] as const){
+  if(String(scalar(e.fx,fxSlot(slot))).toLowerCase()!==apoIds[side].toLowerCase())return undefined
+  const child=scalar(e.child,childKey)
+  if(child!==''&&String(child).toLowerCase()!==windowsLoudnessIds[side])return undefined
+  if(!inventory.dlls[windowsLoudnessIds[side]])return undefined
+ }
+ return windowsLoudnessIds
+}
 export function selectApoEndpoint(inventory:ApoInventory,kind:CableKind){
  const candidates=inventory.endpoints.filter(e=>e.name.toLowerCase()===cableNames[kind].toLowerCase()&&e.adapter==='VB-Audio Virtual Cable'&&[1,2,8].includes(e.state&15))
  const active=candidates.filter(e=>endpointActive(e.state)),matches=active.length===1?active:candidates
@@ -43,7 +61,11 @@ export function planApoRepair(inventory:ApoInventory):ApoPatch[]{
    original[slot]=absent(candidate)?'!VALUE':candidate as string
   }
   const modernFallback=absent(original[1])&&absent(original[2])
-  const pre=modernFallback?original[5]:original[1],post=modernFallback?original[6]:original[2]
+  let pre=modernFallback?original[5]:original[1],post=modernFallback?original[6]:original[2]
+  if(absent(pre)&&absent(post)){
+   const provisioned=provisionedLoudnessEffects(inventory,e)
+   if(provisioned){pre=provisioned.pre;post=provisioned.post}
+  }
   // VB-Cable must expose its native effects; without them LEQ cannot be restored safely.
   if(absent(pre)||absent(post))fail('APO_ORIGINAL_EFFECTS_UNKNOWN',e)
   // Do not discard an additional independent EFX or a different modern processor.

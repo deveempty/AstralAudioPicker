@@ -59,6 +59,14 @@ Before writes, the helper compares the live registry against the inspected state
 
 Support codes: AA-305 missing/ambiguous cable; AA-306 missing APO component registration; AA-307 unknown/incompatible original effects; AA-308 repair verification failure; AA-309 concurrent device change; AA-310 rollback needs support; AA-311 endpoint restart failure; AA-312 elevation failure. Full automatic-update failures retain the underlying cause in failures.jsonl. Manual repair records its result in the repair history. Registration verification is not an acoustic proof of DSP operation.
 
+### AA-307: explicit empty original-effects backup
+
+An upgrade from 3.1.18 can stop on a cable with valid Equalizer APO LFX/GFX slots, a version-2 Child APOs backup containing `!VALUE` in all five effect slots, and empty `PreMixChild` / `PostMixChild`. This proves an empty saved chain, not that the DLLs are missing or that the original effects were lost. Retrying 3.1.18 cannot provision this case.
+
+The repair now provisions the Windows Loudness effects already used by Astral's `SetLoudness.ps1`, only for the exact VB-Audio cable identities and this explicit empty-backup shape. Inventory must confirm both standard CLSIDs are registered as audio processing objects and resolve to the existing Windows System32 `WMALFXGFXDSP.dll`. This check is independent of the other cable. Foreign child processors, missing/corrupt backups, partial original chains and additional modern processors remain blocked.
+
+Only the two child-effect references are needed for the reported state. The original `!VALUE` uninstall metadata, unrelated binary settings and endpoint enable/disable state are preserved. Chain verification recognizes the provisioned pair using the same narrowly scoped checks; a flag alone does not make the chain valid. The existing transaction journal, rollback, endpoint restart policy and Relay recovery still apply. Subsequent LEQ activation/readback remains required. Regression: `node tools-dev/apo-empty-originals-smoke.cjs`.
+
 Reference contract: [Equalizer APO DeviceAPOInfo](https://raw.githubusercontent.com/mirror/equalizerapo/master/DeviceAPOInfo.cpp), installation version 2, LFX/GFX slots and original-effect child registration. Implementation does not bundle upstream source.
 
 Validation: `node tools-dev/apo-repair-smoke.cjs --registry` exercises the actual PowerShell write/rollback/recovery core in isolated HKCU fixtures; `apo-orchestration-smoke.cjs`, `audio-repair-smoke.cjs`, `audio-preparation-smoke.cjs`, `relay-restart-settled-smoke.cjs` and UI tests cover both cables, no-op behavior, migration gating and EN/ES controls. Live repair on the development PC restored the missing 16ch APO, preserved disabled 7.1, enabled LEQ with its release time intact, and retained the Relay route/gains/mute/settings. Evidence: output/apo-live-1794944046030.

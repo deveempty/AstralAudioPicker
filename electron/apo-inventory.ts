@@ -1,6 +1,6 @@
 import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
-import {apoIds,type ApoInventory} from './apo-repair-plan'
+import {apoIds,windowsLoudnessIds,type ApoInventory} from './apo-repair-plan'
 export const apoInventoryScript=String.raw`$ErrorActionPreference='Stop'
 function Read-Values($path){
  if(!(Test-Path -LiteralPath $path)){return $null};$key=Get-Item -LiteralPath $path;$result=@{}
@@ -13,7 +13,7 @@ $endpoints=@(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDe
   @{id=$_.PSChildName;name=$name;adapter=$adapter;state=$_.GetValue('DeviceState');fx=(Read-Values (Join-Path $_.PSPath 'FxProperties'));child=(Read-Values ('HKLM:\SOFTWARE\EqualizerAPO\Child APOs\'+$_.PSChildName))}
  }
 })
-$ids=@('${apoIds.pre}','${apoIds.post}')
+$ids=@('${apoIds.pre}','${apoIds.post}','${windowsLoudnessIds.pre}','${windowsLoudnessIds.post}')
 foreach($e in $endpoints){foreach($set in @($e.fx,$e.child)){if($set){foreach($v in $set.Values){if($v.kind -eq 'String' -and $v.value -match '^\{[a-fA-F0-9-]{36}\}$'){$ids+=$v.value}}}}}
 $dlls=@{};$registered=$true
 foreach($id in ($ids | Select-Object -Unique)){
@@ -24,7 +24,12 @@ $install=(Get-ItemProperty 'HKLM:\SOFTWARE\EqualizerAPO' -ErrorAction SilentlyCo
 foreach($id in @('${apoIds.pre}','${apoIds.post}')){
  if(!$install -or $dlls[$id.ToLowerInvariant()] -ne (Join-Path $install 'EqualizerAPO.dll') -or !(Test-Path ('Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\AudioEngine\AudioProcessingObjects\'+$id))){$registered=$false}
 }
-@{endpoints=$endpoints;dlls=$dlls;registered=$registered} | ConvertTo-Json -Depth 12 -Compress`
+$windowsLoudnessAvailable=$true
+$windowsEffectsDll=Join-Path ([Environment]::GetFolderPath('System')) 'WMALFXGFXDSP.dll'
+foreach($id in @('${windowsLoudnessIds.pre}','${windowsLoudnessIds.post}')){
+ if($dlls[$id] -ne $windowsEffectsDll -or !(Test-Path ('Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\AudioEngine\AudioProcessingObjects\'+$id))){$windowsLoudnessAvailable=$false}
+}
+@{endpoints=$endpoints;dlls=$dlls;registered=$registered;windowsLoudnessAvailable=$windowsLoudnessAvailable} | ConvertTo-Json -Depth 12 -Compress`
 export async function readApoInventory():Promise<ApoInventory>{
  const {stdout}=await promisify(execFile)('powershell.exe',['-NoProfile','-NonInteractive','-Command',apoInventoryScript],{windowsHide:true,timeout:15000,maxBuffer:2*1024*1024})
  return JSON.parse(stdout.replace(/^\uFEFF/,''))
