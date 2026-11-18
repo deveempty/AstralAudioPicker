@@ -12,6 +12,7 @@ export declare class PluginControlStore {
     private locked;
     private snapshot;
     private result;
+    inspect(): PluginResult;
     get(): PluginResult;
     patch(patch: unknown): PluginResult;
     private replaceValues;

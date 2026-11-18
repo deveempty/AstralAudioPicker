@@ -13,9 +13,16 @@ export function routeCustomOutput(content:string,active:boolean):string {
  if(inside)throw Error('AMBIGUOUS_RECONCILIATION')
  const canonical=(line:string)=>line.replace(/^(?:\s*#\s*)+/,'').trim().replace(/\s+ChunkData\s+"[^"\r\n]*"\s*$/i,'')
  const expected=cosmicChain().map(canonical),body:string[]=[]
+ let deviceLine=expected[1]
+ // Equalizer APO may expand the cable name to adapter + endpoint GUID.
+ // Accept that exact cable selector and retain it instead of broadening routing.
+ const cableSelector=/^Device:\s+CABLE In 16ch(?:\s+VB-Audio Virtual Cable\s+\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\})?$/i
  for(let i=0;i<restored.length;i++){
   if(canonical(restored[i])===expected[0]){
-   if(!expected.every((line,n)=>canonical(restored[i+n]??'')===line))throw Error('AMBIGUOUS_RECONCILIATION')
+   const selector=canonical(restored[i+1]??'')
+   if(!expected.every((line,n)=>n===1?cableSelector.test(selector):canonical(restored[i+n]??'')===line))throw Error('AMBIGUOUS_RECONCILIATION')
+   if(deviceLine!==expected[1]&&deviceLine.toLowerCase()!==selector.toLowerCase())throw Error('AMBIGUOUS_RECONCILIATION')
+   deviceLine=selector
    i+=7
    // Remove the obsolete scope reset only when attached to our recognized block.
    if(canonical(restored[i+1]??'').toLowerCase()==='device: all'&&canonical(restored[i+2]??'')==='Channel: ALL')i+=2
@@ -27,6 +34,6 @@ export function routeCustomOutput(content:string,active:boolean):string {
   body.push(line)
  }
  while(body.length&&!body[0].trim())body.shift()
- const chain=cosmicChain().map(line=>active?line:'# '+line)
+ const chain=cosmicChain().map((line,index)=>{const value=index===1?deviceLine:line;return active?value:'# '+value})
  return bom+chain.join(newline)+newline+newline+body.join(newline)
 }

@@ -4,28 +4,29 @@ Source of truth: `shared/audio-errors.ts`. Messages are localized through `src/i
 
 | Code | Internal reason | User message |
 | --- | --- | --- |
-| AA-100 | UNKNOWN | No se pudo completar la preparación del audio. Reintenta o abre un ticket de soporte. |
-| AA-101 | COSMIC_INSTALL_BUSY | Hay otra preparación de Cosmic en curso. Espera y reintenta. |
-| AA-102 | COSMIC_LOCK_RECOVERY_REQUIRED | Una instalación interrumpida de Cosmic necesita recuperación. Abre un ticket de soporte. |
-| AA-201 | AUTO_EQ_TARGET_MISSING | Falta un target de ecualización necesario. Reintenta la actualización de audio. |
-| AA-202 | AUTO_EQ_MEASUREMENT_INVALID | La medición de tus audífonos no se puede leer o no tiene suficientes datos. |
-| AA-203 | AUTO_EQ_TARGET_INVALID | Un target de ecualización tiene datos inválidos o insuficientes. |
-| AA-204 | HEADPHONE_SELECTION_REQUIRED | No se pudo identificar de forma única tu selección anterior. Selecciona tus audífonos en AutoEQ. |
-| AA-301 | APO_CHAIN_UNCONFIRMED | No se pudo verificar la cadena de procesamiento del cable de 16 canales. Abre un ticket con este código. |
+| AA-100 | UNKNOWN | No se pudo completar la preparaciÃ³n del audio. Reintenta o abre un ticket de soporte. |
+| AA-101 | COSMIC_INSTALL_BUSY | Hay otra preparaciÃ³n de Cosmic en curso. Espera y reintenta. |
+| AA-102 | COSMIC_LOCK_RECOVERY_REQUIRED | Una instalaciÃ³n interrumpida de Cosmic necesita recuperaciÃ³n. Abre un ticket de soporte. |
+| AA-103 | AMBIGUOUS_RECONCILIATION | La configuraciÃ³n de Cosmic contiene un bloque que no se pudo actualizar con seguridad. Adjunta config.txt en un ticket. |
+| AA-201 | AUTO_EQ_TARGET_MISSING | Falta un target de ecualizaciÃ³n necesario. Reintenta la actualizaciÃ³n de audio. |
+| AA-202 | AUTO_EQ_MEASUREMENT_INVALID | La mediciÃ³n de tus audÃ­fonos no se puede leer o no tiene suficientes datos. |
+| AA-203 | AUTO_EQ_TARGET_INVALID | Un target de ecualizaciÃ³n tiene datos invÃ¡lidos o insuficientes. |
+| AA-204 | HEADPHONE_SELECTION_REQUIRED | No se pudo identificar de forma Ãºnica tu selecciÃ³n anterior. Selecciona tus audÃ­fonos en AutoEQ. |
+| AA-301 | APO_CHAIN_UNCONFIRMED | No se pudo verificar la cadena de procesamiento del cable de 16 canales. Abre un ticket con este cÃ³digo. |
 | AA-302 | LOUDNESS_READBACK_FAILED | No se pudo confirmar Loudness EQ en el cable de 16 canales. |
-| AA-401 | RELAY_ROUTE_UNCONFIRMED | La entrada de audio o la salida de audífonos no está lista. Revisa Enrutamiento de audio y reintenta. |
-| AA-402 | AUDIO_PREPARATION_BUSY | La preparación del audio sigue en curso. Espera antes de cambiar los ajustes. |
-| AA-501 | PREPARATION_INTERRUPTED | La preparación anterior se interrumpió. Reintenta para verificarla y continuar. |
-| AA-205 | AUTO_EQ_OUTPUT_INVALID | La EQ generada no pasó la validación. Se conservó tu EQ anterior. |
+| AA-401 | RELAY_ROUTE_UNCONFIRMED | La entrada de audio o la salida de audÃ­fonos no estÃ¡ lista. Revisa Enrutamiento de audio y reintenta. |
+| AA-402 | AUDIO_PREPARATION_BUSY | La preparaciÃ³n del audio sigue en curso. Espera antes de cambiar los ajustes. |
+| AA-501 | PREPARATION_INTERRUPTED | La preparaciÃ³n anterior se interrumpiÃ³. Reintenta para verificarla y continuar. |
+| AA-205 | AUTO_EQ_OUTPUT_INVALID | La EQ generada no pasÃ³ la validaciÃ³n. Se conservÃ³ tu EQ anterior. |
 | AA-207 | AUTO_EQ_BUSY | Wait for the current EQ generation to finish, then retry. |
-| AA-206 | AUTO_EQ_ROLLBACK_INCOMPLETE | La recuperación de EQ necesita asistencia. Abre un ticket antes de cambiar perfiles. |
-| AA-303 | AUDIO_CONFIG_INVALID | La configuración de audio apunta a archivos ausentes o inválidos. Abre un ticket de soporte. |
-| AA-403 | RELAY_INSTALL_REQUIRED | Falta el motor de audio. Instálalo para continuar. |
-| AA-404 | RELAY_RESTART_REQUIRED | Windows necesita reiniciarse para terminar la instalación del motor de audio. |
-| AA-405 | RELAY_STARTUP_CONFLICT | Hay otra configuración de inicio que requiere revisión. Abre un ticket de soporte. |
+| AA-206 | AUTO_EQ_ROLLBACK_INCOMPLETE | La recuperaciÃ³n de EQ necesita asistencia. Abre un ticket antes de cambiar perfiles. |
+| AA-303 | AUDIO_CONFIG_INVALID | La configuraciÃ³n de audio apunta a archivos ausentes o invÃ¡lidos. Abre un ticket de soporte. |
+| AA-403 | RELAY_INSTALL_REQUIRED | Falta el motor de audio. InstÃ¡lalo para continuar. |
+| AA-404 | RELAY_RESTART_REQUIRED | Windows necesita reiniciarse para terminar la instalaciÃ³n del motor de audio. |
+| AA-405 | RELAY_STARTUP_CONFLICT | Hay otra configuraciÃ³n de inicio que requiere revisiÃ³n. Abre un ticket de soporte. |
 | AA-406 | RELAY_CONFIGURATION_CHANGED | No se pudo conservar la ruta de audio anterior. Revisa Enrutamiento de audio y reintenta. |
 | AA-304 | LOUDNESS_WRITE_OR_RESTART_FAILED | Windows no pudo aplicar Loudness EQ o reconectar el cable. Reintenta o abre un ticket. |
-| AA-407 | LOUDNESS_RELAY_RESTART_FAILED | El cable cambió, pero Relay no pudo reconectarse. Revisa Enrutamiento de audio. |
+| AA-407 | LOUDNESS_RELAY_RESTART_FAILED | El cable cambiÃ³, pero Relay no pudo reconectarse. Revisa Enrutamiento de audio. |
 
 ## Diagnostic files
 
@@ -74,3 +75,11 @@ Validation: `node tools-dev/apo-repair-smoke.cjs --registry` exercises the actua
 Run `npm run typecheck`, `node tools-dev/post-update-smoke.cjs`, `node tools-dev/audio-preparation-smoke.cjs`, `node tools-dev/preparation-ui.cjs`, and the existing audio-upgrade/game-selection tests. Hardware writes, engine restarts and downloads in the new pipeline tests are mocked. The APO reader has also been checked read-only on the development PC.
 
 Before production, test an actual packaged update on an existing installation (including a deliberately disabled LEQ) and a fresh-install VM. Confirm UAC, endpoint reconnection and audible playback. No production release is represented by passing the isolated tests.
+
+### Cosmic disconnected despite valid installation checks
+
+On 2026-11-17, read-only inspection found valid APO registration but no Cosmic/Equalizer APO modules in audiodg and no recent Cosmic heartbeat. After the user restarted audio, audiodg loaded EqualizerAPO.dll, WMALFXGFXDSP.dll and Cosmic.dll. A new heartbeat acknowledged revision 1203 and reported advancing audio blocks and nonzero input/output. This demonstrates recovery after restart on this PC; it does not establish which prior update operation left the engine unloaded or prove the cause on other PCs.
+
+Diagnostics now checks live Cosmic activity when Cosmic is selected. It verifies the heartbeat PID against audiodg processes actually loading the configured DLL, advancing blocks across two observations, the current settings fingerprint/revision, processing state and enabled modules. Silence and inaccessible process information remain unconfirmed; offline and stale processing require attention instead of an all-verified summary. The shipped DLL can report `audioService: false` inside audiodg, so this diagnostic verifies the process independently rather than trusting that flag. Checks are read-only and never initialize the settings file, switch endpoints or restart audio. A positive result is runtime DSP evidence, not an acoustic headphone measurement.
+
+Regression: `node tools-dev/cosmic-runtime-smoke.cjs`. Optional `--read-live` uses the current playback without emitting test audio. Live read-only verification returned `cosmicRuntimeConfirmed` after the user's restart. Included in release 3.1.21 alongside the qualified Cosmic endpoint reconciliation fix and the distinction between Loudness EQ reads and writes. This release does not claim to resolve every reported disconnected-engine case.

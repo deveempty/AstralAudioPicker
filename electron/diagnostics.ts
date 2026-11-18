@@ -1,6 +1,7 @@
 import {readApoEndpoints} from './apo-diagnostics'
 import {loudnessChecks,legacyApoCheck} from './loudness-diagnostics'
 import {relayChecks} from './relay-diagnostics'
+import {cosmicRuntimeCheck} from './cosmic-runtime-diagnostics'
 import type {VmState} from '../shared/voicemeeter'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -35,5 +36,6 @@ export async function runDiagnostics(relayStatus?:()=>Promise<VmState>):Promise<
  checks.push(...await loudnessChecks())
  checks.push(await legacyApoCheck())
  if(relayStatus){try{checks.push(...relayChecks(await relayStatus()))}catch{add('relay','unknown','relayUnavailable')}}
+ if(cosmic)checks.push(await cosmicRuntimeCheck())
  return {checkedAt:Date.now(),checks}
 }

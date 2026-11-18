@@ -1,4 +1,9 @@
 export declare const audioErrors: {
+    readonly AMBIGUOUS_RECONCILIATION: {
+        readonly code: "AA-103";
+        readonly en: "The Cosmic configuration contains a block that could not be updated safely. Open a support ticket and attach config.txt from Equalizer APO.";
+        readonly es: "La configuración de Cosmic contiene un bloque que no se pudo actualizar con seguridad. Abre un ticket y adjunta config.txt de Equalizer APO.";
+    };
     readonly APO_ENDPOINT_UNAVAILABLE: {
         readonly code: "AA-305";
         readonly en: "The 7.1 or 16-channel cable is missing or cannot be identified uniquely. Check the cable installation.";
@@ -151,6 +156,10 @@ export declare const audioErrors: {
     };
 };
 export declare function audioError(raw: string | undefined): {
+    readonly code: "AA-103";
+    readonly en: "The Cosmic configuration contains a block that could not be updated safely. Open a support ticket and attach config.txt from Equalizer APO.";
+    readonly es: "La configuración de Cosmic contiene un bloque que no se pudo actualizar con seguridad. Abre un ticket y adjunta config.txt de Equalizer APO.";
+} | {
     readonly code: "AA-305";
     readonly en: "The 7.1 or 16-channel cable is missing or cannot be identified uniquely. Check the cable installation.";
     readonly es: "Falta el cable 7.1 o el de 16 canales, o no se puede identificar de forma única. Revisa la instalación de los cables.";

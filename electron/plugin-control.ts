@@ -46,6 +46,7 @@ export class PluginControlStore {
   private result(action: () => PluginSnapshot): PluginResult {
     try { return { success: true, snapshot: action() } } catch (e) { return { success: false, code: e instanceof ControlError || e instanceof PresetError ? e.code : 'storage' } }
   }
+  inspect(): PluginResult { return this.result(() => this.snapshot()) }
   get(): PluginResult { return this.result(() => { if (!fs.existsSync(this.file('profile.json'))) this.locked(() => { if (!fs.existsSync(this.file('profile.json'))) this.write('profile.json', standardState()) }); return this.snapshot() }) }
   patch(patch: unknown): PluginResult { return this.result(() => {
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new ControlError('invalid')
