@@ -1,4 +1,9 @@
 export declare const audioErrors: {
+    readonly CONTENT_EXTRACTION_FAILED: {
+        readonly code: "AA-104";
+        readonly en: "The audio update package could not be extracted. Retry; if it happens again, open a support ticket and attach the details.";
+        readonly es: "No se pudo descomprimir el paquete de actualización de audio. Reintenta; si vuelve a ocurrir, abre un ticket de soporte y adjunta los datos.";
+    };
     readonly AMBIGUOUS_RECONCILIATION: {
         readonly code: "AA-103";
         readonly en: "The Cosmic configuration contains a block that could not be updated safely. Open a support ticket and attach config.txt from Equalizer APO.";
@@ -156,6 +161,10 @@ export declare const audioErrors: {
     };
 };
 export declare function audioError(raw: string | undefined): {
+    readonly code: "AA-104";
+    readonly en: "The audio update package could not be extracted. Retry; if it happens again, open a support ticket and attach the details.";
+    readonly es: "No se pudo descomprimir el paquete de actualización de audio. Reintenta; si vuelve a ocurrir, abre un ticket de soporte y adjunta los datos.";
+} | {
     readonly code: "AA-103";
     readonly en: "The Cosmic configuration contains a block that could not be updated safely. Open a support ticket and attach config.txt from Equalizer APO.";
     readonly es: "La configuración de Cosmic contiene un bloque que no se pudo actualizar con seguridad. Abre un ticket y adjunta config.txt de Equalizer APO.";

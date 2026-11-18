@@ -8,6 +8,7 @@ Source of truth: `shared/audio-errors.ts`. Messages are localized through `src/i
 | AA-101 | COSMIC_INSTALL_BUSY | Hay otra preparación de Cosmic en curso. Espera y reintenta. |
 | AA-102 | COSMIC_LOCK_RECOVERY_REQUIRED | Una instalación interrumpida de Cosmic necesita recuperación. Abre un ticket de soporte. |
 | AA-103 | AMBIGUOUS_RECONCILIATION | La configuración de Cosmic contiene un bloque que no se pudo actualizar con seguridad. Adjunta config.txt en un ticket. |
+| AA-104 | CONTENT_EXTRACTION_FAILED | No se pudo descomprimir el paquete de actualización de audio. Reintenta y adjunta los datos si persiste. |
 | AA-201 | AUTO_EQ_TARGET_MISSING | Falta un target de ecualización necesario. Reintenta la actualización de audio. |
 | AA-202 | AUTO_EQ_MEASUREMENT_INVALID | La medición de tus audífonos no se puede leer o no tiene suficientes datos. |
 | AA-203 | AUTO_EQ_TARGET_INVALID | Un target de ecualización tiene datos inválidos o insuficientes. |
@@ -27,6 +28,12 @@ Source of truth: `shared/audio-errors.ts`. Messages are localized through `src/i
 | AA-406 | RELAY_CONFIGURATION_CHANGED | No se pudo conservar la ruta de audio anterior. Revisa Enrutamiento de audio y reintenta. |
 | AA-304 | LOUDNESS_WRITE_OR_RESTART_FAILED | Windows no pudo aplicar Loudness EQ o reconectar el cable. Reintenta o abre un ticket. |
 | AA-407 | LOUDNESS_RELAY_RESTART_FAILED | El cable cambió, pero Relay no pudo reconectarse. Revisa Enrutamiento de audio. |
+
+## ZIP extraction failure in 3.1.21
+
+The affected client's `content` logs show Windows `tar.exe` failing with "Archive entry has empty or unreadable filename" after the archive passed byte-count and SHA-256 verification. The old generic catch classified this as AA-501; it does not prove the user interrupted preparation. The package contains Unicode measurement names. Extraction now uses .NET ZipFile (also used to create the package), with UTF-16 encoded PowerShell invocation and private temporary staging. All manifest hashes are still verified before applying any file. Failures retain stderr and exit status under AA-104; no completion marker is written. Retry still revalidates prerequisites and preserves backups.
+
+Tests: `node tools-dev/audio-extraction-smoke.cjs` (Unicode paths, invalid ZIP, collisions, traversal) and `node tools-dev/audio-upgrade-content-smoke.cjs` (all 14,785 packaged files, idempotence, hashes and rollback). Included in optional release 3.1.22; minimum required version remains 3.1.21. Extraction was verified in an isolated local lab; verification on the affected client's PC remains pending.
 
 ## Diagnostic files
 

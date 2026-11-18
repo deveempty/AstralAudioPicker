@@ -8,6 +8,20 @@ export interface ContentFile {path:string;sha256:string;bytes:number}
 export interface ContentManifest {id:string;archiveSha256:string;archiveBytes:number;files:ContentFile[];installerSha256:string;installerBytes:number}
 const hash=(data:Buffer)=>createHash('sha256').update(data).digest('hex')
 const exists=async(p:string)=>{try{await fs.access(p);return true}catch{return false}}
+// Use the same ZIP implementation as prepare-audio-update.cjs. Windows tar
+// can reject Unicode measurement filenames depending on the client's locale.
+// Extract only into private staging; ZipFile rejects paths outside that folder.
+export async function extractAudioContent(archive:string,stage:string){
+ const quote=(value:string)=>"'"+value.replaceAll("'","''")+"'"
+ const script=`$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::ExtractToDirectory(${quote(archive)},${quote(stage)})`
+ const powershell=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe')
+ try{
+  await promisify(execFile)(powershell,['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:120000})
+ }catch(error){
+  const failure=error as {code?:string|number;stderr?:string;killed?:boolean}
+  throw new Error('CONTENT_EXTRACTION_FAILED',{cause:{code:failure.code,stderr:String(failure.stderr||'').slice(0,4000),killed:failure.killed===true}})
+ }
+}
 export function contentDestination(relative:string,roots:Record<string,string>){
  const parts=relative.split('/')
  if(parts.length<2||parts.some(p=>!p||p==='.'||p==='..'||/[\\:]/.test(p))||!roots[parts[0]])throw Error('CONTENT_UNSAFE_PATH')
@@ -74,7 +88,7 @@ export async function installAudioContent(resources:string,apo:string,localData:
  await withDownloadedAsset({name:'mw4-content-v1.zip',sha256:manifest.archiveSha256,bytes:manifest.archiveBytes},async(archive,workspace)=>{
   onPhase?.('content')
   const stage=path.join(workspace,'extracted');await fs.mkdir(stage)
-  await promisify(execFile)('tar.exe',['-xf',archive,'-C',stage],{windowsHide:true,timeout:120000})
+  await extractAudioContent(archive,stage)
   const changed=await applyContentFiles(stage,manifest,roots,path.join(migrationRoot,'backups','mw4-'+Date.now()))
   await migrateV5Includes(apo, migrationRoot)
   await fs.writeFile(marker+'.tmp',JSON.stringify({id:manifest.id,archiveSha256:manifest.archiveSha256,layoutVersion:2,completed:true,changed,completedAt:new Date().toISOString()}))

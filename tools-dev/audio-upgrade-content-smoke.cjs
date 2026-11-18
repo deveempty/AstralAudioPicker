@@ -1,13 +1,13 @@
 const fs=require('node:fs/promises'),sync=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),cp=require('node:child_process'),esbuild=require('esbuild');
 const hash=data=>crypto.createHash('sha256').update(data).digest('hex');
 esbuild.buildSync({entryPoints:['electron/audio-content.ts'],bundle:true,platform:'node',format:'cjs',outfile:'output/audio-content-test.cjs'});
-const {applyContentFiles,contentDestination}=require('../output/audio-content-test.cjs');
+const {applyContentFiles,contentDestination,extractAudioContent}=require('../output/audio-content-test.cjs');
 (async()=>{
  const base=await fs.mkdtemp(path.resolve('output/content-lab-')),stage=path.join(base,'stage');await fs.mkdir(stage);
  const packageRoot=path.resolve('resources/audio-update'),manifest=JSON.parse(await fs.readFile(path.join(packageRoot,'manifest.json'),'utf8'));
  assert.equal(hash(await fs.readFile(path.join(packageRoot,'mw4-content-v1.zip'))),manifest.archiveSha256);
  assert.equal(hash(await fs.readFile(path.join(packageRoot,'voicemeetersetup.exe'))),manifest.installerSha256);
- cp.execFileSync('tar.exe',['-xf',path.join(packageRoot,'mw4-content-v1.zip'),'-C',stage],{windowsHide:true});
+ await extractAudioContent(path.join(packageRoot,'mw4-content-v1.zip'),stage);
  const roots=Object.fromEntries(['presets','charlie','measurements','targets','reference-eq'].map(k=>[k,path.join(base,'installed',k)]));
  const sentinel=path.join(base,'installed','config.txt');await fs.mkdir(path.dirname(sentinel),{recursive:true});await fs.writeFile(sentinel,'User configuration stays intact');
  assert.throws(()=>contentDestination('presets/../config.txt',roots));assert.throws(()=>contentDestination('charlie/other.dll',roots));

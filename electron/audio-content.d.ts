@@ -11,6 +11,7 @@ export interface ContentManifest {
     installerSha256: string;
     installerBytes: number;
 }
+export declare function extractAudioContent(archive: string, stage: string): Promise<void>;
 export declare function contentDestination(relative: string, roots: Record<string, string>): string;
 export declare function applyContentFiles(source: string, manifest: ContentManifest, roots: Record<string, string>, backup: string): Promise<number>;
 export declare function installAudioContent(resources: string, apo: string, localData: string, migrationRoot: string, onPhase?: (phase: 'downloading' | 'content') => void): Promise<void>;
