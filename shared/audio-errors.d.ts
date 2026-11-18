@@ -1,4 +1,9 @@
 export declare const audioErrors: {
+    readonly RELAY_EDITION_MISSING: {
+        readonly code: "AA-408";
+        readonly en: "The executable for your Voicemeeter edition could not be found. Open a support ticket and attach the details; your audio route has not been changed by this step.";
+        readonly es: "No se encontró el ejecutable de tu edición de Voicemeeter. Abre un ticket y adjunta los datos; este paso no ha cambiado tu ruta de audio.";
+    };
     readonly CONTENT_EXTRACTION_FAILED: {
         readonly code: "AA-104";
         readonly en: "The audio update package could not be extracted. Retry; if it happens again, open a support ticket and attach the details.";
@@ -161,6 +166,10 @@ export declare const audioErrors: {
     };
 };
 export declare function audioError(raw: string | undefined): {
+    readonly code: "AA-408";
+    readonly en: "The executable for your Voicemeeter edition could not be found. Open a support ticket and attach the details; your audio route has not been changed by this step.";
+    readonly es: "No se encontró el ejecutable de tu edición de Voicemeeter. Abre un ticket y adjunta los datos; este paso no ha cambiado tu ruta de audio.";
+} | {
     readonly code: "AA-104";
     readonly en: "The audio update package could not be extracted. Retry; if it happens again, open a support ticket and attach the details.";
     readonly es: "No se pudo descomprimir el paquete de actualización de audio. Reintenta; si vuelve a ocurrir, abre un ticket de soporte y adjunta los datos.";

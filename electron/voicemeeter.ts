@@ -5,6 +5,7 @@ import {execFile,spawn} from 'node:child_process'
 import {promisify} from 'node:util'
 import type {VmCommand,VmDevice,VmState} from '../shared/voicemeeter'
 import {vmDrivers,vmSettingValues,type VmSetting,type VmSettings} from '../shared/voicemeeter'
+import {relayExecutables} from './relay-executables'
 
 const run=promisify(execFile),delay=(ms:number)=>new Promise(r=>setTimeout(r,ms))
 export function relayRestartSettled(before:VmState,after:VmState){
@@ -79,7 +80,7 @@ export function createVoicemeeter(preferredEdition:()=>number=()=>1){
   try{
    await init();let current=await status()
    if(request.action==='connect'){
-    if(!current.connected){const exe=path.join(folder,preferredEdition()===3?'voicemeeter8.exe':preferredEdition()===2?'voicemeeterpro.exe':'voicemeeter.exe');if(!fs.existsSync(exe))throw Error('VM_NOT_INSTALLED');const child=spawn(exe,[],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref()
+    if(!current.connected){const exe=relayExecutables(folder).find(e=>e.edition===preferredEdition())?.path;if(!exe)throw Error('RELAY_EDITION_MISSING');const child=spawn(exe,[],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref()
      for(let i=0;i<40&&!current.connected;i++){await delay(100);hide();current=await status()}
     }
     if(!current.connected)throw Error('VM_NOT_RUNNING');hide();return current
@@ -170,5 +171,5 @@ export function createVoicemeeter(preferredEdition:()=>number=()=>1){
    throw Error('VM_BACKUP_UNCONFIRMED')
   }finally{busy=false}
  }
- return {status,command,withEndpointRestart,backupSettings,async executables(){await init();return [1,2,3].map(edition=>({edition,path:path.join(folder,edition===3?'voicemeeter8.exe':edition===2?'voicemeeterpro.exe':'voicemeeter.exe')})).filter(e=>fs.existsSync(e.path))},dispose(){if(logged){api?.logout();logged=false}/* Engine intentionally remains running. */}}
+ return {status,command,withEndpointRestart,backupSettings,async executables(){await init();return relayExecutables(folder)},dispose(){if(logged){api?.logout();logged=false}/* Engine intentionally remains running. */}}
 }

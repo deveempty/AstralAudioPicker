@@ -48,7 +48,6 @@ export function createAudioUpgrade(vm:ReturnType<typeof createVoicemeeter>,prepa
    }
    if(!current.strips[0]?.name||!current.bus.name)return set('needsRoute')
    if(completed)return set('ready')
-   await save(path.join(root(),'engine.json'),{edition:current.edition})
    const engine=executables.find(e=>e.edition===current.edition)?.path
    if(!engine)throw Error('RELAY_EDITION_MISSING')
    await save(path.join(root(),'engine.json'),{edition:current.edition,path:engine})

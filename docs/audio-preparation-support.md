@@ -16,6 +16,7 @@ Source of truth: `shared/audio-errors.ts`. Messages are localized through `src/i
 | AA-301 | APO_CHAIN_UNCONFIRMED | No se pudo verificar la cadena de procesamiento del cable de 16 canales. Abre un ticket con este código. |
 | AA-302 | LOUDNESS_READBACK_FAILED | No se pudo confirmar Loudness EQ en el cable de 16 canales. |
 | AA-401 | RELAY_ROUTE_UNCONFIRMED | La entrada de audio o la salida de audífonos no está lista. Revisa Enrutamiento de audio y reintenta. |
+| AA-408 | RELAY_EDITION_MISSING | No se encontró el ejecutable de la edición de Voicemeeter. Adjunta los datos a soporte. La conexión a su DLL no confirma la detección del ejecutable para el arranque. |
 | AA-402 | AUDIO_PREPARATION_BUSY | La preparación del audio sigue en curso. Espera antes de cambiar los ajustes. |
 | AA-501 | PREPARATION_INTERRUPTED | La preparación anterior se interrumpió. Reintenta para verificarla y continuar. |
 | AA-205 | AUTO_EQ_OUTPUT_INVALID | La EQ generada no pasó la validación. Se conservó tu EQ anterior. |
@@ -34,6 +35,12 @@ Source of truth: `shared/audio-errors.ts`. Messages are localized through `src/i
 The affected client's `content` logs show Windows `tar.exe` failing with "Archive entry has empty or unreadable filename" after the archive passed byte-count and SHA-256 verification. The old generic catch classified this as AA-501; it does not prove the user interrupted preparation. The package contains Unicode measurement names. Extraction now uses .NET ZipFile (also used to create the package), with UTF-16 encoded PowerShell invocation and private temporary staging. All manifest hashes are still verified before applying any file. Failures retain stderr and exit status under AA-104; no completion marker is written. Retry still revalidates prerequisites and preserves backups.
 
 Tests: `node tools-dev/audio-extraction-smoke.cjs` (Unicode paths, invalid ZIP, collisions, traversal) and `node tools-dev/audio-upgrade-content-smoke.cjs` (all 14,785 packaged files, idempotence, hashes and rollback). Included in optional release 3.1.22; minimum required version remains 3.1.21. Extraction was verified in an isolated local lab; verification on the affected client's PC remains pending.
+
+## Relay executable detection in 3.1.23
+
+`RELAY_EDITION_MISSING` means the connected API edition could not be matched to an installed executable for startup preparation. The affected client's folder showed `voicemeeter_x64.exe`, while previous discovery only checked unsuffixed executable names. Release 3.1.23 checks both names for each edition, returns one candidate per edition, and uses the same resolver when starting Relay. It preserves the previous preference when both variants exist. A missing candidate stops preparation before startup transfer and no longer replaces engine.json with an unverified edition-only record. AA-408 provides a specific EN/ES support message instead of AA-100.
+
+Validation: `relay-executables-smoke.cjs`, `audio-upgrade-relay-smoke.cjs`, `relay-restart-settled-smoke.cjs`, and TypeScript. Tests cover x64-only editions, duplicate architectures, missing candidates, and rollback using isolated files/mocked Windows operations. The affected client's live update remains to be verified. This release is optional and retains minimumVersion 3.1.21.
 
 ## Diagnostic files
 
